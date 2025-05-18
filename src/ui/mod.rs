@@ -10,15 +10,15 @@ use ratatui::{
 use crate::app::App;
 
 pub fn ui(f: &mut Frame, app: &mut App) {
-    // Create the layout
+    // Create the layout - optimized for small terminals
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(1)
+        .margin(0)  // Reduce margin to save space
         .constraints(
             [
-                Constraint::Length(3),
+                Constraint::Length(1),  // Smaller title area
                 Constraint::Min(0),
-                Constraint::Length(3),
+                Constraint::Length(1),  // Smaller input area
             ]
             .as_ref(),
         )
@@ -30,14 +30,14 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
-    // Create the main area with rooms and users
+    // Create the main area with rooms and users - optimized for small terminals
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(20),
-                Constraint::Percentage(60),
-                Constraint::Percentage(20),
+                Constraint::Percentage(30),  // Increase room area
+                Constraint::Percentage(40),  // Decrease main content
+                Constraint::Percentage(30),  // Increase user area
             ]
             .as_ref(),
         )
@@ -67,10 +67,6 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 }
 
 fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
-    eprintln!("Rendering {} rooms", app.rooms.len());
-    for (i, room) in app.rooms.iter().enumerate() {
-        eprintln!("Room {}: {}", i, room.name);
-    }
     
     let rooms: Vec<ListItem> = app
         .rooms
@@ -83,26 +79,23 @@ fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::White)
             };
             
+            // Compact format for small terminals
             ListItem::new(Text::from(Span::styled(
-                format!(" {} ", room.name),
+                room.name.clone(),
                 style,
             )))
         })
         .collect();
 
     let rooms_list = List::new(rooms)
-        .block(Block::default().borders(Borders::ALL).title("Rooms"))
+        .block(Block::default().borders(Borders::NONE).title("R"))  // Remove borders, shorten title
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol("> ");
+        .highlight_symbol(">");
 
     f.render_widget(rooms_list, area);
 }
 
 fn render_users(f: &mut Frame, app: &App, area: Rect) {
-    eprintln!("Rendering {} users", app.users.len());
-    for (i, user) in app.users.iter().enumerate() {
-        eprintln!("User {}: {} (Status: {:?})", i, user.name, user.status);
-    }
     
     let users: Vec<ListItem> = app
         .users
@@ -132,7 +125,7 @@ fn render_users(f: &mut Frame, app: &App, area: Rect) {
             use ratatui::text::Line;
             let spans = vec![
                 Span::styled(
-                    format!(" {} ", status_symbol),
+                    format!("{}", status_symbol), // Remove extra spaces
                     Style::default().fg(status_color),
                 ),
                 Span::styled(format!("{}", user.name), style),
@@ -143,17 +136,17 @@ fn render_users(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let users_list = List::new(users)
-        .block(Block::default().borders(Borders::ALL).title("Users"))
+        .block(Block::default().borders(Borders::NONE).title("U")) // Remove borders, shorten title
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol("> ");
+        .highlight_symbol(">");
 
     f.render_widget(users_list, area);
 }
 
 fn render_main_content(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!("Room: {}", app.rooms[app.current_room].name));
+        .borders(Borders::NONE)  // Remove borders to save space
+        .title(format!("{}", app.rooms[app.current_room].name));
     
     f.render_widget(block, area);
 }
@@ -161,7 +154,7 @@ fn render_main_content(f: &mut Frame, app: &App, area: Rect) {
 fn render_input(f: &mut Frame, app: &App, area: Rect) {
     let input = Paragraph::new(app.input.as_str())
         .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL).title("Input"));
+        .block(Block::default().borders(Borders::NONE));  // Remove borders and title to save space
     
     f.render_widget(input, area);
 }
