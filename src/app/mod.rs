@@ -9,6 +9,7 @@ pub use state::AppState;
 pub use user::User;
 pub use room::Room;
 pub use message::Message;
+use crate::ui::TabView;
 
 pub struct App {
     pub state: AppState,
@@ -21,6 +22,7 @@ pub struct App {
     pub notification: Option<String>,
     pub selected_user: Option<usize>,
     pub error: Option<String>,
+    pub view: TabView,
 }
 
 impl App {
@@ -53,13 +55,30 @@ impl App {
             notification: None,
             selected_user: None,
             error: None,
+            view: TabView::Rooms, // Default view is rooms
         }
+    }
+    
+    pub fn switch_to_rooms_view(&mut self) {
+        self.view = TabView::Rooms;
+    }
+    
+    pub fn switch_to_users_view(&mut self) {
+        self.view = TabView::Users;
+    }
+    
+    pub fn switch_to_chat_view(&mut self) {
+        self.view = TabView::Chat;
     }
     
     pub fn handle_key(&mut self, key: KeyEvent) {
         match self.state {
             AppState::Normal => {
                 match key.code {
+                    KeyCode::Char('r') => self.switch_to_rooms_view(),
+                    KeyCode::Char('u') => self.switch_to_users_view(),
+                    KeyCode::Char('c') => self.switch_to_chat_view(),
+                    
                     KeyCode::Char('i') => self.state = AppState::Input,
                     KeyCode::Tab => self.select_next_user(),
                     _ => {}

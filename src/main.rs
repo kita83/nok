@@ -17,7 +17,7 @@ use ratatui::{
 };
 
 use app::App;
-use ui::ui;
+use ui::{ui, TabView};
 
 fn main() -> Result<(), io::Error> {
     // Setup terminal

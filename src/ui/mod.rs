@@ -1,244 +1,199 @@
 use ratatui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    text::{Line, Span},
+    widgets::Paragraph,
     Frame,
 };
 
-use crate::app::App;
+use crate::app::{App, AppState};
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum TabView {
+    Rooms,
+    Users,
+    Chat,
+}
 
 pub fn ui(f: &mut Frame, app: &mut App) {
-    // Create the layout - optimized for small terminals
+    let size = f.size();
+    
+    // Create a horizontal layout for the single line UI
     let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(0)  // Reduce margin to save space
-        .constraints(
-            [
-                Constraint::Length(1),  // Smaller title area
-                Constraint::Min(0),
-                Constraint::Length(1),  // Smaller input area
-            ]
-            .as_ref(),
-        )
-        .split(f.size());
-
-    // Create the title
-    let title = Paragraph::new("nok - Terminal Virtual Office")
-        .style(Style::default().fg(Color::Cyan))
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(title, chunks[0]);
-
-    // Create the main area with rooms and users - optimized for small terminals
-    let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
             [
-                Constraint::Percentage(30),  // Increase room area
-                Constraint::Percentage(40),  // Decrease main content
-                Constraint::Percentage(30),  // Increase user area
+                Constraint::Percentage(100),
             ]
             .as_ref(),
         )
-        .split(chunks[1]);
-
-    // Render rooms list
-    render_rooms(f, app, main_chunks[0]);
-
-    // Render main content area
-    render_main_content(f, app, main_chunks[1]);
-
-    // Render users list
-    render_users(f, app, main_chunks[2]);
-
-    // Render input box
-    render_input(f, app, chunks[2]);
-
-    // Render notification if any
-    if let Some(notification) = &app.notification {
-        render_notification(f, notification, f.size());
-    }
+        .split(size);
     
-    // Render error if any
-    if let Some(error) = &app.error {
-        render_error(f, error, f.size());
-    }
-}
-
-fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
-    
-    let rooms: Vec<ListItem> = app
-        .rooms
-        .iter()
-        .enumerate()
-        .map(|(i, room)| {
-            let style = if i == app.current_room {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
+    // Render different content based on view and state
+    match (app.view, app.state) {
+        (TabView::Rooms, AppState::Normal) => {
+            let room_names: Vec<String> = app.rooms.iter().map(|r| r.name.clone()).collect();
             
-            // Compact format for small terminals
-            ListItem::new(Text::from(Span::styled(
-                room.name.clone(),
-                style,
-            )))
-        })
-        .collect();
-
-    let rooms_list = List::new(rooms)
-        .block(Block::default().borders(Borders::NONE).title("R"))  // Remove borders, shorten title
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(">");
-
-    f.render_widget(rooms_list, area);
-}
-
-fn render_users(f: &mut Frame, app: &App, area: Rect) {
-    
-    let users: Vec<ListItem> = app
-        .users
-        .iter()
-        .enumerate()
-        .map(|(i, user)| {
-            let status_color = match user.status {
-                crate::app::user::UserStatus::Online => Color::Green,
-                crate::app::user::UserStatus::Away => Color::Yellow,
-                crate::app::user::UserStatus::Busy => Color::Red,
-                crate::app::user::UserStatus::Offline => Color::Gray,
-            };
-            
-            let status_symbol = match user.status {
-                crate::app::user::UserStatus::Online => "●",
-                crate::app::user::UserStatus::Away => "○",
-                crate::app::user::UserStatus::Busy => "◆",
-                crate::app::user::UserStatus::Offline => "◇",
-            };
-            
-            let style = if app.selected_user == Some(i) {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            
-            use ratatui::text::Line;
-            let spans = vec![
-                Span::styled(
-                    format!("{}", status_symbol), // Remove extra spaces
-                    Style::default().fg(status_color),
-                ),
-                Span::styled(format!("{}", user.name), style),
+            let mut spans = vec![
+                Span::styled("nok", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::raw(" | "),
+                Span::styled("Rooms:", Style::default().fg(Color::Yellow)),
+                Span::raw(" "),
             ];
-            let line = Text::from(Line::from(spans));
-            ListItem::new(line)
-        })
-        .collect();
-
-    let users_list = List::new(users)
-        .block(Block::default().borders(Borders::NONE).title("U")) // Remove borders, shorten title
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(">");
-
-    f.render_widget(users_list, area);
-}
-
-fn render_main_content(f: &mut Frame, app: &App, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::NONE)  // Remove borders to save space
-        .title(format!("{}", app.rooms[app.current_room].name));
+            
+            for (i, name) in room_names.iter().enumerate() {
+                let style = if i == app.current_room {
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                
+                spans.push(Span::styled(name.clone(), style));
+                if i < room_names.len() - 1 {
+                    spans.push(Span::raw(" "));
+                }
+            }
+            
+            spans.extend(vec![
+                Span::raw(" | "),
+                Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":rooms "),
+                Span::styled("u", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":users "),
+                Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":chat "),
+                Span::styled("i", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":input "),
+                Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":quit"),
+            ]);
+            
+            let line = Line::from(spans);
+            let paragraph = Paragraph::new(line);
+            f.render_widget(paragraph, chunks[0]);
+        },
+        
+        (TabView::Users, AppState::Normal) => {
+            let mut spans = vec![
+                Span::styled("nok", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::raw(" | "),
+                Span::styled("Users:", Style::default().fg(Color::Yellow)),
+                Span::raw(" "),
+            ];
+            
+            for (i, user) in app.users.iter().enumerate() {
+                let status_color = match user.status {
+                    crate::app::user::UserStatus::Online => Color::Green,
+                    crate::app::user::UserStatus::Away => Color::Yellow,
+                    crate::app::user::UserStatus::Busy => Color::Red,
+                    crate::app::user::UserStatus::Offline => Color::Gray,
+                };
+                
+                let status_symbol = match user.status {
+                    crate::app::user::UserStatus::Online => "●",
+                    crate::app::user::UserStatus::Away => "○",
+                    crate::app::user::UserStatus::Busy => "◆",
+                    crate::app::user::UserStatus::Offline => "◇",
+                };
+                
+                let style = if app.selected_user == Some(i) {
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                
+                spans.push(Span::styled(status_symbol, Style::default().fg(status_color)));
+                spans.push(Span::raw(" "));
+                spans.push(Span::styled(user.name.clone(), style));
+                
+                if i < app.users.len() - 1 {
+                    spans.push(Span::raw(" "));
+                }
+            }
+            
+            spans.extend(vec![
+                Span::raw(" | "),
+                Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":rooms "),
+                Span::styled("u", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":users "),
+                Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":chat "),
+                Span::styled("i", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":input "),
+                Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":quit"),
+            ]);
+            
+            let line = Line::from(spans);
+            let paragraph = Paragraph::new(line);
+            f.render_widget(paragraph, chunks[0]);
+        },
+        
+        (TabView::Chat, AppState::Normal) => {
+            let current_room = &app.rooms[app.current_room].name;
+            
+            let spans = vec![
+                Span::styled("nok", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::raw(" | "),
+                Span::styled(format!("Chat - {}", current_room), Style::default().fg(Color::Yellow)),
+                Span::raw(" | "),
+                Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":rooms "),
+                Span::styled("u", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":users "),
+                Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":chat "),
+                Span::styled("i", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":input "),
+                Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(":quit"),
+            ];
+            
+            let line = Line::from(spans);
+            let paragraph = Paragraph::new(line);
+            f.render_widget(paragraph, chunks[0]);
+        },
+        
+        (_, AppState::Input) => {
+            let spans = vec![
+                Span::styled("nok", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::raw(" | "),
+                Span::styled("Input:", Style::default().fg(Color::Yellow)),
+                Span::raw(" "),
+                Span::styled(app.input.as_str(), Style::default().fg(Color::White)),
+            ];
+            
+            let line = Line::from(spans);
+            let paragraph = Paragraph::new(line);
+            f.render_widget(paragraph, chunks[0]);
+        },
+    }
     
-    f.render_widget(block, area);
-}
-
-fn render_input(f: &mut Frame, app: &App, area: Rect) {
-    let input = Paragraph::new(app.input.as_str())
-        .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::NONE));  // Remove borders and title to save space
-    
-    f.render_widget(input, area);
-}
-
-fn render_notification(f: &mut Frame, notification: &str, area: Rect) {
-    let width = 50;
-    let height = 6;
-    
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage((100 - height) / 2),
-                Constraint::Length(height),
-                Constraint::Percentage((100 - height) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(area);
-
-    let popup_horizontal_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage((100 - width) / 2),
-                Constraint::Percentage(width),
-                Constraint::Percentage((100 - width) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(popup_layout[1]);
-
-    let popup_area = popup_horizontal_layout[1];
-    
-    let notification_text = Paragraph::new(notification.to_string())
-        .style(Style::default().fg(Color::Yellow))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::Yellow))
-                .title("Notification"),
-        );
-    
-    f.render_widget(notification_text, popup_area);
-}
-
-fn render_error(f: &mut Frame, error: &str, area: Rect) {
-    let width = 50;
-    let height = 6;
-    
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage((100 - height) / 2),
-                Constraint::Length(height),
-                Constraint::Percentage((100 - height) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(area);
-
-    let popup_horizontal_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage((100 - width) / 2),
-                Constraint::Percentage(width),
-                Constraint::Percentage((100 - width) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(popup_layout[1]);
-
-    let popup_area = popup_horizontal_layout[1];
-    
-    let error_text = Paragraph::new(error.to_string())
-        .style(Style::default().fg(Color::Red))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::Red))
-                .title("Error"),
-        );
-    
-    f.render_widget(error_text, popup_area);
+    // Render notification or error if any (single-line approach)
+    if let Some(notification) = &app.notification {
+        let spans = vec![
+            Span::styled("nok", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::raw(" | "),
+            Span::styled("KON KON", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw(" | "),
+            Span::styled(notification, Style::default().fg(Color::Yellow)),
+        ];
+        
+        let line = Line::from(spans);
+        let paragraph = Paragraph::new(line);
+        f.render_widget(paragraph, chunks[0]);
+    } else if let Some(error) = &app.error {
+        let spans = vec![
+            Span::styled("nok", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::raw(" | "),
+            Span::styled("ERROR", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::raw(" | "),
+            Span::styled(error, Style::default().fg(Color::Red)),
+        ];
+        
+        let line = Line::from(spans);
+        let paragraph = Paragraph::new(line);
+        f.render_widget(paragraph, chunks[0]);
+    }
 }
