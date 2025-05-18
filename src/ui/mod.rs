@@ -119,13 +119,15 @@ fn render_users(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::White)
             };
             
-            let line = Text::from(vec![
+            use ratatui::text::Line;
+            let spans = vec![
                 Span::styled(
                     format!(" {} ", status_symbol),
                     Style::default().fg(status_color),
-                ).to_owned(),
-                Span::styled(format!("{}", user.name), style).to_owned(),
-            ]);
+                ),
+                Span::styled(format!("{}", user.name), style),
+            ];
+            let line = Text::from(Line::from(spans));
             ListItem::new(line)
         })
         .collect();
