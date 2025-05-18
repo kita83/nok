@@ -2,14 +2,14 @@ use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
+    text::{Span, Text},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
 
 use crate::app::App;
 
-pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn ui(f: &mut Frame, app: &mut App) {
     // Create the layout
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -66,7 +66,7 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     }
 }
 
-fn render_rooms<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
     let rooms: Vec<ListItem> = app
         .rooms
         .iter()
@@ -78,7 +78,7 @@ fn render_rooms<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
                 Style::default().fg(Color::White)
             };
             
-            ListItem::new(Spans::from(vec![Span::styled(
+            ListItem::new(Text::from(vec![Span::styled(
                 format!(" {} ", room.name),
                 style,
             )]))
@@ -93,7 +93,7 @@ fn render_rooms<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     f.render_widget(rooms_list, area);
 }
 
-fn render_users<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_users(f: &mut Frame, app: &App, area: Rect) {
     let users: Vec<ListItem> = app
         .users
         .iter()
@@ -119,7 +119,7 @@ fn render_users<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
                 Style::default().fg(Color::White)
             };
             
-            ListItem::new(Spans::from(vec![
+            ListItem::new(Text::from(vec![
                 Span::styled(
                     format!(" {} ", status_symbol),
                     Style::default().fg(status_color),
@@ -137,7 +137,7 @@ fn render_users<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     f.render_widget(users_list, area);
 }
 
-fn render_main_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_main_content(f: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!("Room: {}", app.rooms[app.current_room].name));
@@ -145,7 +145,7 @@ fn render_main_content<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     f.render_widget(block, area);
 }
 
-fn render_input<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn render_input(f: &mut Frame, app: &App, area: Rect) {
     let input = Paragraph::new(app.input.as_ref())
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Input"));
@@ -153,7 +153,7 @@ fn render_input<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     f.render_widget(input, area);
 }
 
-fn render_notification<B: Backend>(f: &mut Frame<B>, notification: &str, area: Rect) {
+fn render_notification(f: &mut Frame, notification: &str, area: Rect) {
     let width = 50;
     let height = 6;
     
@@ -195,7 +195,7 @@ fn render_notification<B: Backend>(f: &mut Frame<B>, notification: &str, area: R
     f.render_widget(notification_text, popup_area);
 }
 
-fn render_error<B: Backend>(f: &mut Frame<B>, error: &str, area: Rect) {
+fn render_error(f: &mut Frame, error: &str, area: Rect) {
     let width = 50;
     let height = 6;
     

@@ -1,5 +1,5 @@
 mod state;
-mod user;
+pub mod user;
 mod room;
 mod message;
 
@@ -68,7 +68,8 @@ impl App {
             AppState::Input => {
                 match key.code {
                     KeyCode::Enter => {
-                        self.handle_command(&self.input);
+                        let input_clone = self.input.clone();
+                        self.handle_command(&input_clone);
                         self.input.clear();
                         self.state = AppState::Normal;
                     },
