@@ -67,6 +67,11 @@ pub fn ui(f: &mut Frame, app: &mut App) {
 }
 
 fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
+    eprintln!("Rendering {} rooms", app.rooms.len());
+    for (i, room) in app.rooms.iter().enumerate() {
+        eprintln!("Room {}: {}", i, room.name);
+    }
+    
     let rooms: Vec<ListItem> = app
         .rooms
         .iter()
@@ -94,6 +99,11 @@ fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_users(f: &mut Frame, app: &App, area: Rect) {
+    eprintln!("Rendering {} users", app.users.len());
+    for (i, user) in app.users.iter().enumerate() {
+        eprintln!("User {}: {} (Status: {:?})", i, user.name, user.status);
+    }
+    
     let users: Vec<ListItem> = app
         .users
         .iter()
