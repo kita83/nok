@@ -78,10 +78,10 @@ fn render_rooms(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::White)
             };
             
-            ListItem::new(Text::from(vec![Span::styled(
+            ListItem::new(Text::from(Span::styled(
                 format!(" {} ", room.name),
                 style,
-            )]))
+            )))
         })
         .collect();
 
@@ -119,13 +119,14 @@ fn render_users(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::White)
             };
             
-            ListItem::new(Text::from(vec![
+            let line = Text::from(vec![
                 Span::styled(
                     format!(" {} ", status_symbol),
                     Style::default().fg(status_color),
-                ),
-                Span::styled(format!("{}", user.name), style),
-            ]))
+                ).to_owned(),
+                Span::styled(format!("{}", user.name), style).to_owned(),
+            ]);
+            ListItem::new(line)
         })
         .collect();
 
@@ -146,7 +147,7 @@ fn render_main_content(f: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_input(f: &mut Frame, app: &App, area: Rect) {
-    let input = Paragraph::new(app.input.as_ref())
+    let input = Paragraph::new(app.input.as_str())
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL).title("Input"));
     
