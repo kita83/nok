@@ -59,6 +59,11 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     if let Some(notification) = &app.notification {
         render_notification(f, notification, f.size());
     }
+    
+    // Render error if any
+    if let Some(error) = &app.error {
+        render_error(f, error, f.size());
+    }
 }
 
 fn render_rooms<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
@@ -92,7 +97,8 @@ fn render_users<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     let users: Vec<ListItem> = app
         .users
         .iter()
-        .map(|user| {
+        .enumerate()
+        .map(|(i, user)| {
             let status_color = match user.status {
                 crate::app::user::UserStatus::Online => Color::Green,
                 crate::app::user::UserStatus::Away => Color::Yellow,
@@ -107,12 +113,18 @@ fn render_users<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
                 crate::app::user::UserStatus::Offline => "◇",
             };
             
+            let style = if app.selected_user == Some(i) {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
             ListItem::new(Spans::from(vec![
                 Span::styled(
                     format!(" {} ", status_symbol),
                     Style::default().fg(status_color),
                 ),
-                Span::raw(format!("{}", user.name)),
+                Span::styled(format!("{}", user.name), style),
             ]))
         })
         .collect();
@@ -181,4 +193,46 @@ fn render_notification<B: Backend>(f: &mut Frame<B>, notification: &str, area: R
         );
     
     f.render_widget(notification_text, popup_area);
+}
+
+fn render_error<B: Backend>(f: &mut Frame<B>, error: &str, area: Rect) {
+    let width = 50;
+    let height = 6;
+    
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage((100 - height) / 2),
+                Constraint::Length(height),
+                Constraint::Percentage((100 - height) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(area);
+
+    let popup_horizontal_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage((100 - width) / 2),
+                Constraint::Percentage(width),
+                Constraint::Percentage((100 - width) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1]);
+
+    let popup_area = popup_horizontal_layout[1];
+    
+    let error_text = Paragraph::new(error.to_string())
+        .style(Style::default().fg(Color::Red))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::Red))
+                .title("Error"),
+        );
+    
+    f.render_widget(error_text, popup_area);
 }

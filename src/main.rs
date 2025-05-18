@@ -67,6 +67,15 @@ fn run_app<B: ratatui::backend::Backend>(
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('n') => {
+                        if let Some(user) = app.get_selected_user() {
+                            app.knock(&user.name);
+                            // Play knock sound
+                            if let Err(e) = audio::play_knock_sound() {
+                                app.set_error(format!("Failed to play sound: {}", e));
+                            }
+                        }
+                    },
                     _ => app.handle_key(key),
                 }
             }

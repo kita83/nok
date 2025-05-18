@@ -4,6 +4,7 @@ mod room;
 mod message;
 
 use crossterm::event::KeyEvent;
+use crossterm::event::KeyCode;
 pub use state::AppState;
 pub use user::User;
 pub use room::Room;
@@ -18,6 +19,8 @@ pub struct App {
     pub current_room: usize,
     pub input: String,
     pub notification: Option<String>,
+    pub selected_user: Option<usize>,
+    pub error: Option<String>,
 }
 
 impl App {
@@ -48,17 +51,35 @@ impl App {
             current_room: 0,
             input: String::new(),
             notification: None,
+            selected_user: None,
+            error: None,
         }
     }
     
     pub fn handle_key(&mut self, key: KeyEvent) {
-        // Handle key events based on current state
         match self.state {
             AppState::Normal => {
-                // Handle normal mode keys
+                match key.code {
+                    KeyCode::Char('i') => self.state = AppState::Input,
+                    KeyCode::Tab => self.select_next_user(),
+                    _ => {}
+                }
             },
             AppState::Input => {
-                // Handle input mode keys
+                match key.code {
+                    KeyCode::Enter => {
+                        self.handle_command(&self.input);
+                        self.input.clear();
+                        self.state = AppState::Normal;
+                    },
+                    KeyCode::Esc => {
+                        self.input.clear();
+                        self.state = AppState::Normal;
+                    },
+                    KeyCode::Char(c) => self.input.push(c),
+                    KeyCode::Backspace => { self.input.pop(); },
+                    _ => {}
+                }
             },
         }
     }
@@ -73,5 +94,41 @@ impl App {
         
         // Here we would play the knock sound
         // audio::play_knock_sound();
+    }
+    
+    pub fn get_selected_user(&self) -> Option<&User> {
+        self.selected_user.and_then(|idx| self.users.get(idx))
+    }
+    
+    pub fn set_error(&mut self, error: String) {
+        self.error = Some(error);
+    }
+    
+    pub fn select_next_user(&mut self) {
+        if !self.users.is_empty() {
+            let new_idx = match self.selected_user {
+                Some(idx) => (idx + 1) % self.users.len(),
+                None => 0,
+            };
+            self.selected_user = Some(new_idx);
+        }
+    }
+    
+    pub fn handle_command(&mut self, input: &str) {
+        if input.starts_with("nok @") {
+            let username = input.trim_start_matches("nok @").trim();
+            let user_exists = self.users.iter().any(|u| u.name == username);
+            
+            if user_exists {
+                self.knock(username);
+                
+                // Play knock sound
+                if let Err(e) = crate::audio::play_knock_sound() {
+                    self.set_error(format!("Failed to play sound: {}", e));
+                }
+            } else {
+                self.set_error(format!("User '{}' not found", username));
+            }
+        }
     }
 }
