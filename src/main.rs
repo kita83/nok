@@ -69,7 +69,8 @@ fn run_app<B: ratatui::backend::Backend>(
                     KeyCode::Char('q') => return Ok(()),
                     KeyCode::Char('n') => {
                         if let Some(user) = app.get_selected_user() {
-                            app.knock(&user.name);
+                            let username = user.name.clone();
+                            app.knock(&username);
                             // Play knock sound
                             if let Err(e) = audio::play_knock_sound() {
                                 app.set_error(format!("Failed to play sound: {}", e));
