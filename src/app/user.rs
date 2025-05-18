@@ -7,7 +7,7 @@ pub struct User {
     pub last_active: u64,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum UserStatus {
     Online,
     Away,
