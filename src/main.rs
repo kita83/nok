@@ -29,7 +29,7 @@ fn main() -> Result<(), io::Error> {
 
     // Create app state
     let app = App::new();
-    
+
     // Run app
     let res = run_app(&mut terminal, app);
 
@@ -55,7 +55,7 @@ fn run_app<B: ratatui::backend::Backend>(
 ) -> io::Result<()> {
     let tick_rate = Duration::from_millis(100);
     let mut last_tick = std::time::Instant::now();
-    
+
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
@@ -68,13 +68,27 @@ fn run_app<B: ratatui::backend::Backend>(
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
                     KeyCode::Char('n') => {
-                        if let Some(user) = app.get_selected_user() {
-                            let username = user.name.clone();
-                            app.knock(&username);
-                            // Play knock sound
-                            if let Err(e) = audio::play_knock_sound() {
-                                app.set_error(format!("Failed to play sound: {}", e));
+                        if app.focused_pane == app::PaneIdentifier::Users {
+                            if let Some(user_idx) = app.selected_user {
+                                // Ensure the user_idx is valid before trying to access app.users[user_idx]
+                                if let Some(user) = app.users.get(user_idx) {
+                                    let username = user.name.clone();
+                                    app.knock(&username);
+                                    // Play knock sound
+                                    if let Err(e) = audio::play_knock_sound() {
+                                        app.set_error(format!("Failed to play sound: {}", e));
+                                    }
+                                } else {
+                                    // This case should ideally not happen if selected_user is managed correctly
+                                    app.set_error("Selected user index is out of bounds.".to_string());
+                                }
+                            } else {
+                                app.set_error("No user selected to knock.".to_string());
                             }
+                        } else {
+                            // Optionally, provide feedback if 'n' is pressed outside Users pane focus
+                            // app.set_error("Switch to Users pane (Tab or 'u') and select a user to knock ('n').".to_string());
+                            // For now, do nothing if not in Users pane focus, to avoid spamming errors
                         }
                     },
                     _ => app.handle_key(key),

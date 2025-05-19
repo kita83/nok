@@ -1,13 +1,17 @@
 # nok (ノック)
 
-A terminal-based virtual office application inspired by gather.town and metalife.co.jp, but designed for the terminal with a minimal CUI interface similar to lazygit/lazydocker.
+nok is a minimalist, retro-styled, terminal-based virtual office tool that allows distributed teams to feel present, reachable, and casually connected — all from the command line. Inspired by the simple act of knocking on a door, nok brings presence awareness and real-time communication to remote-first teams, one gentle "kon kon" at a time.
 
-## Features
+## ⚙️ Key Features
 
-- Terminal-based virtual office with rooms and user presence
-- Gentle "knock" notifications with sound effects and ASCII animations
-- Minimal and lightweight interface
-- Written in Rust using ratatui
+* **Terminal UI (TUI)**: Lightweight, retro feel that blends into developer workflows using ratatui
+* **Knock to Notify**: Send a subtle "knock" (sound + ASCII animation) to others
+* **Presence Indicators**: See who is available, away, or offline in real time
+* **Quick Commands**: `nok @user` — fast and human
+* **Single-line Display**: Optimized to work in height-constrained terminals
+* **Tab Switching**: View switching with r (rooms), u (users), c (chat) keys
+* **Voice Readout**: Optional text-to-speech feature that reads messages aloud — bridging the gap between chat and casual voice presence
+* **Command Mode**: Enter command mode with `i` key to send messages, join rooms, etc.
 
 ## Usage
 
