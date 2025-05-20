@@ -1,4 +1,4 @@
-# nok (ノック)
+# nok (ノク)
 
 nok is a minimalist, retro-styled, terminal-based virtual office tool that allows distributed teams to feel present, reachable, and casually connected — all from the command line. Inspired by the simple act of knocking on a door, nok brings presence awareness and real-time communication to remote-first teams, one gentle "kon kon" at a time.
 
