@@ -12,7 +12,6 @@ The name "nok" (knock) derives from the concept of gently knocking on someone's 
 * **Knock to Notify**: Send a subtle "knock" (sound + ASCII animation) to others
 * **Presence Indicators**: See who is available, away, or offline in real time
 * **Quick Commands**: `nok @user` — fast and human
-* **Single-line Display**: Optimized to work in height-constrained terminals
 * **Tab Switching**: View switching with r (rooms), u (users), c (chat) keys
 * **Voice Readout**: Optional text-to-speech feature that reads messages aloud — bridging the gap between chat and casual voice presence
 * **Command Mode**: Enter command mode with `i` key to send messages, join rooms, etc.
