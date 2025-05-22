@@ -10,10 +10,16 @@ nok is a minimalist, terminal-based virtual office tool that allows distributed 
 * **Knock to Notify**: Send a subtle "knock" (sound + ASCII animation) to others
 * **Presence Indicators**: See who is available, away, or offline in real time
 * **Quick Commands**: `nok @user` — fast and human
-* **Single-line Display**: Optimized to work in height-constrained terminals
 * **Tab Switching**: View switching with r (rooms), u (users), c (chat) keys
 * **Voice Readout**: Optional text-to-speech feature that reads messages aloud — bridging the gap between chat and casual voice presence
 * **Command Mode**: Enter command mode with `i` key to send messages, join rooms, etc.
+
+## Audio
+
+The `audio` module uses the rodio library to play sound effects. Main features:
+
+- Knock sound playback
+- Optional text-to-speech (TTS) readouts for incoming messages
 
 ## Usage
 
