@@ -1,0 +1,1052 @@
+[
+  {
+    "description": "  アプリケーションのユーザーとして\n  TODOの追加、完了状態の変更、削除ができるようにしたい\n  タスクを効率的に管理するため",
+    "elements": [
+      {
+        "description": "",
+        "id": "todo管理機能;新しいtodoを追加する",
+        "keyword": "シナリオ",
+        "line": 10,
+        "name": "新しいTODOを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 68728350
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 550458196
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 11,
+            "name": "ユーザーが \"新しいタスク\" というTODOを \"田中太郎\" に追加する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:17"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1087518931
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 12,
+            "name": "TODO一覧に \"新しいタスク\" が表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5476999
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 17520886
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;todoを完了状態にする",
+        "keyword": "シナリオ",
+        "line": 14,
+        "name": "TODOを完了状態にする",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 61356915
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 520623449
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 15,
+            "name": "TODO一覧に \"買い物に行く\" が存在する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 20872049
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 16,
+            "name": "ユーザーが \"買い物に行く\" を完了状態にする",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:23"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1037972039
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 17,
+            "name": "\"買い物に行く\" が完了状態として表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:51"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4507177
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 13310680
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;完了したtodoを未完了状態に戻す",
+        "keyword": "シナリオ",
+        "line": 19,
+        "name": "完了したTODOを未完了状態に戻す",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 60838259
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 521428269
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 20,
+            "name": "TODO一覧に \"レポートを書く\" が完了状態で存在する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:10"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 21628284
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 21,
+            "name": "ユーザーが \"レポートを書く\" を未完了状態にする",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1021664988
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 22,
+            "name": "\"レポートを書く\" が未完了状態として表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:56"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5369015
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 13640488
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;todoを削除する",
+        "keyword": "シナリオ",
+        "line": 24,
+        "name": "TODOを削除する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 59973031
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 518666841
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 25,
+            "name": "TODO一覧に \"会議の準備\" が存在する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 19404811
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 26,
+            "name": "ユーザーが \"会議の準備\" というTODOを削除する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:37"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1036004311
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 27,
+            "name": "TODO一覧に \"会議の準備\" が表示されない",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:46"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3548735
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 13948193
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;複数のtodoを管理する",
+        "keyword": "シナリオ",
+        "line": 29,
+        "name": "複数のTODOを管理する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 59688231
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 521510490
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 30,
+            "name": "ユーザーが \"プレゼン資料作成\" というTODOを \"佐藤花子\" に追加する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:17"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1082757491
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "かつ",
+            "line": 31,
+            "name": "ユーザーが \"メール返信\" というTODOを \"田中太郎\" に追加する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:17"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1065640339
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 32,
+            "name": "TODO一覧に \"プレゼン資料作成\" が表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3406447
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "かつ",
+            "line": 33,
+            "name": "TODO一覧に \"メール返信\" が表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1823878
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 13837978
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;異なるユーザーにtodoを追加する",
+        "keyword": "シナリオアウトライン",
+        "line": 41,
+        "name": "異なるユーザーにTODOを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 59524101
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 525004845
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 36,
+            "name": "ユーザーが \"資料の確認\" というTODOを \"田中太郎\" に追加する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:17"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1074894587
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 37,
+            "name": "TODO一覧に \"資料の確認\" が表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4024943
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 13845262
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;異なるユーザーにtodoを追加する",
+        "keyword": "シナリオアウトライン",
+        "line": 42,
+        "name": "異なるユーザーにTODOを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 60654189
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 532305935
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 36,
+            "name": "ユーザーが \"会議室の予約\" というTODOを \"佐藤花子\" に追加する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:17"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1073564016
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 37,
+            "name": "TODO一覧に \"会議室の予約\" が表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3849359
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 14552942
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "todo管理機能;異なるユーザーにtodoを追加する",
+        "keyword": "シナリオアウトライン",
+        "line": 43,
+        "name": "異なるユーザーにTODOを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 59885793
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 522535926
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 36,
+            "name": "ユーザーが \"システムの更新\" というTODOを \"田中太郎\" に追加する",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:17"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1083263716
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 37,
+            "name": "TODO一覧に \"システムの更新\" が表示される",
+            "match": {
+              "location": "features/step_definitions/todo_steps.js:41"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3928437
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 14277433
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "todo管理機能",
+    "line": 2,
+    "keyword": "フィーチャ",
+    "name": "TODO管理機能",
+    "tags": [],
+    "uri": "features/todo_management.feature"
+  },
+  {
+    "description": "  アプリケーションのユーザーとして\n  ユーザーの追加、表示、削除ができるようにしたい\n  ユーザー情報を効率的に管理するため",
+    "elements": [
+      {
+        "description": "",
+        "id": "ユーザー管理機能;新しいユーザーを追加する",
+        "keyword": "シナリオ",
+        "line": 10,
+        "name": "新しいユーザーを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 61468585
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 520365529
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 11,
+            "name": "ユーザーが名前 \"山田太郎\"、メールアドレス \"yamada@example.com\"、年齢 \"28\" でユーザーを追加する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1097900875
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 12,
+            "name": "ユーザー一覧に \"山田太郎\" が表示される",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:25"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3883937
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 14615228
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "ユーザー管理機能;複数のユーザーを追加する",
+        "keyword": "シナリオ",
+        "line": 14,
+        "name": "複数のユーザーを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 61670921
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 547832300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 15,
+            "name": "ユーザーが名前 \"鈴木花子\"、メールアドレス \"suzuki@example.com\"、年齢 \"32\" でユーザーを追加する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1085671902
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "かつ",
+            "line": 16,
+            "name": "ユーザーが名前 \"高橋次郎\"、メールアドレス \"takahashi@example.com\"、年齢 \"25\" でユーザーを追加する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1085213906
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 17,
+            "name": "ユーザー一覧に \"鈴木花子\" が表示される",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:25"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4034591
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "かつ",
+            "line": 18,
+            "name": "ユーザー一覧に \"高橋次郎\" が表示される",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:25"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3108127
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 18233379
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "ユーザー管理機能;既存のユーザーを削除する",
+        "keyword": "シナリオ",
+        "line": 20,
+        "name": "既存のユーザーを削除する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 61454576
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 521788155
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 21,
+            "name": "ユーザー一覧に \"田中太郎\" が存在する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:10"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 19183551
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 22,
+            "name": "ユーザーが \"田中太郎\" というユーザーを削除する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:21"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1036729374
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 23,
+            "name": "ユーザー一覧に \"田中太郎\" が表示されない",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3727101
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 13791582
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "ユーザー管理機能;異なる年齢のユーザーを追加する",
+        "keyword": "シナリオアウトライン",
+        "line": 31,
+        "name": "異なる年齢のユーザーを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 60489186
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 522506281
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 26,
+            "name": "ユーザーが名前 \"若者太郎\"、メールアドレス \"wakamono@example.com\"、年齢 \"20\" でユーザーを追加する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1081380015
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 27,
+            "name": "ユーザー一覧に \"若者太郎\" が表示される",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:25"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3875528
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 14451891
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "ユーザー管理機能;異なる年齢のユーザーを追加する",
+        "keyword": "シナリオアウトライン",
+        "line": 32,
+        "name": "異なる年齢のユーザーを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 60321303
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 523562405
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 26,
+            "name": "ユーザーが名前 \"中年花子\"、メールアドレス \"chuunen@example.com\"、年齢 \"45\" でユーザーを追加する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1097004313
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 27,
+            "name": "ユーザー一覧に \"中年花子\" が表示される",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:25"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4141597
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 14250037
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "ユーザー管理機能;異なる年齢のユーザーを追加する",
+        "keyword": "シナリオアウトライン",
+        "line": 33,
+        "name": "異なる年齢のユーザーを追加する",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 60658703
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "前提",
+            "line": 8,
+            "name": "ユーザーがホームページにアクセスしている",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:5"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 518732549
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "もし",
+            "line": 26,
+            "name": "ユーザーが名前 \"高齢次郎\"、メールアドレス \"kourei@example.com\"、年齢 \"70\" でユーザーを追加する",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1083753217
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "ならば",
+            "line": 27,
+            "name": "ユーザー一覧に \"高齢次郎\" が表示される",
+            "match": {
+              "location": "features/step_definitions/user_steps.js:25"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3528104
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 15454134
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "ユーザー管理機能",
+    "line": 2,
+    "keyword": "フィーチャ",
+    "name": "ユーザー管理機能",
+    "tags": [],
+    "uri": "features/user_management.feature"
+  }
+]
