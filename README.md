@@ -1,49 +1,43 @@
-# nok
+nok
 
-🚧 This project is under active development and not ready for production use.
+🚧 このプロジェクトは現在アクティブに開発中であり、本番環境での使用にはまだ適していません。
 
-nok is a minimalist, terminal-based virtual office tool that allows distributed teams to feel present, reachable, and casually connected — all from the command line. Inspired by the simple act of knocking on a door, nok brings presence awareness and real-time communication to remote-first teams, one gentle "kon kon" at a time.
+nok は、分散型チームがCLI（コマンドライン）から「今ここにいる」感覚を得られるようにする、ミニマリストなターミナルベースのバーチャルオフィスツールです。ドアをノックするというシンプルな行為にインスパイアされており、リモートファーストのチームに、存在感の共有とリアルタイムなコミュニケーションを穏やかな「コンコン」と共に届けます。
 
-## ⚙️ Key Features
+⚙️ 主な機能
+	•	ターミナルUI (TUI)：ratatuiを使用した軽量でレトロな雰囲気。開発者のワークフローに自然に溶け込む
+	•	ノック通知機能：他のメンバーにさりげなく「ノック」（音＋ASCIIアニメーション）を送信
+	•	プレゼンスインジケーター：誰が利用可能か、離席中か、オフラインかをリアルタイムに表示
+	•	クイックコマンド：nok @user — 直感的で高速な操作
+	•	タブ切り替え：r（ルーム）、u（ユーザー）、c（チャット）キーでビューを切り替え
+	•	音声読み上げ：TTS（テキスト読み上げ）機能でメッセージを音声出力 — チャットとカジュアルな音声コミュニケーションの架け橋に
+	•	コマンドモード：iキーでコマンドモードに入り、メッセージ送信やルーム参加などを実行可能
 
-* **Terminal UI (TUI)**: Lightweight, retro feel that blends into developer workflows using ratatui
-* **Knock to Notify**: Send a subtle "knock" (sound + ASCII animation) to others
-* **Presence Indicators**: See who is available, away, or offline in real time
-* **Quick Commands**: `nok @user` — fast and human
-* **Tab Switching**: View switching with r (rooms), u (users), c (chat) keys
-* **Voice Readout**: Optional text-to-speech feature that reads messages aloud — bridging the gap between chat and casual voice presence
-* **Command Mode**: Enter command mode with `i` key to send messages, join rooms, etc.
+オーディオ
 
-## Audio
+audioモジュールは rodio ライブラリを使って効果音を再生します。主な機能：
+	•	ノック音の再生
+	•	受信メッセージのTTS（テキスト読み上げ）オプション
 
-The `audio` module uses the rodio library to play sound effects. Main features:
+使い方
 
-- Knock sound playback
-- Optional text-to-speech (TTS) readouts for incoming messages
-
-## Usage
-
-```
-# Run the application
+# アプリケーションの実行
 cargo run
 
-# Basic commands
-nok @username    # Knock on a user's door
-/join room_name  # Join a different room
-/status away     # Change your status
-/help            # Show help
-```
+# 基本コマンド
+nok @username    # 指定ユーザーのドアをノック
+/join room_name  # 他のルームに参加
+/status away     # ステータスを「離席中」に変更
+/help            # ヘルプを表示
 
-## Development
+開発
 
-```
-# Build the project
+# プロジェクトのビルド
 cargo build
 
-# Run tests
+# テストの実行
 cargo test
-```
 
-## License
+ライセンス
 
-MIT
+MITライセンス

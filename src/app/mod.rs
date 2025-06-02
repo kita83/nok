@@ -6,10 +6,12 @@ mod message;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyCode;
 pub use state::AppState;
-pub use user::User;
+pub use user::{User, UserStatus};
 pub use room::Room;
 pub use message::Message;
 use crate::ui::TabView;
+use crate::api::{ApiClient, WebSocketClient};
+use tokio::sync::mpsc;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PaneIdentifier {
@@ -38,6 +40,18 @@ pub struct App {
     pub view: TabView,
     pub focused_pane: PaneIdentifier,
     pub my_aa_position: (u16, u16), // (x, y) for player in ASCII Art pane
+    // API連携用のフィールド
+    pub api_client: ApiClient,
+    pub websocket_client: WebSocketClient,
+    pub connection_status: ConnectionStatus,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum ConnectionStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+    Error(String),
 }
 
 impl App {
@@ -45,24 +59,10 @@ impl App {
         // Create a default user
         let current_user = User::new("You".to_string());
 
-        // Create some example rooms
-        let rooms = vec![
-            Room::new("Main Room".to_string()),
-            Room::new("Meeting Room".to_string()),
-            Room::new("Break Room".to_string()),
-        ];
-
-        // Create some example users
-        let users = vec![
-            User::new("Alice".to_string()),
-            User::new("Bob".to_string()),
-            User::new("Charlie".to_string()),
-        ];
-
         Self {
             state: AppState::Normal,
-            users,
-            rooms,
+            users: Vec::new(),
+            rooms: Vec::new(),
             messages: Vec::new(),
             current_user,
             current_room: 0,
@@ -75,6 +75,163 @@ impl App {
             view: TabView::Rooms,
             focused_pane: PaneIdentifier::Rooms,
             my_aa_position: (5, 2), // Initial position for player's AA
+            api_client: ApiClient::new(),
+            websocket_client: WebSocketClient::new(),
+            connection_status: ConnectionStatus::Disconnected,
+        }
+    }
+
+    // バックエンドとの接続を初期化
+    pub async fn initialize_connection(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.connection_status = ConnectionStatus::Connecting;
+
+        // まずヘルスチェック
+        if let Err(e) = self.api_client.health_check().await {
+            self.connection_status = ConnectionStatus::Error(format!("Backend connection failed: {}", e));
+            return Err(e);
+        }
+
+        // ユーザーを作成または取得
+        if self.current_user.id.is_none() {
+            // まず既存ユーザーを検索
+            match self.api_client.find_user_by_name(&self.current_user.name).await {
+                Ok(Some(existing_user)) => {
+                    // 既存ユーザーが見つかった場合はそれを使用
+                    self.current_user.id = Some(existing_user.id.clone());
+                    self.current_user.status = match existing_user.status.as_str() {
+                        "online" => UserStatus::Online,
+                        "away" => UserStatus::Away,
+                        "busy" => UserStatus::Busy,
+                        _ => UserStatus::Offline,
+                    };
+                }
+                Ok(None) => {
+                    // 既存ユーザーがいない場合は新規作成
+                    match self.api_client.create_user(&self.current_user.name).await {
+                        Ok(api_user) => {
+                            self.current_user.id = Some(api_user.id.clone());
+                        }
+                        Err(e) => {
+                            self.connection_status = ConnectionStatus::Error(format!("Failed to create user: {}", e));
+                            return Err(e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    self.connection_status = ConnectionStatus::Error(format!("Failed to find user: {}", e));
+                    return Err(e);
+                }
+            }
+        }
+
+        // データを初期読み込み
+        self.refresh_data().await?;
+
+        // WebSocket接続
+        if let Some(ref user_id) = self.current_user.id {
+            if let Err(e) = self.websocket_client.connect(user_id).await {
+                self.connection_status = ConnectionStatus::Error(format!("WebSocket connection failed: {}", e));
+                return Err(e);
+            }
+        }
+
+        self.connection_status = ConnectionStatus::Connected;
+        Ok(())
+    }
+
+    // バックエンドからデータを更新
+    pub async fn refresh_data(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // ユーザー一覧を取得
+        match self.api_client.get_users().await {
+            Ok(api_users) => {
+                self.users = api_users.into_iter().map(|u| u.into()).collect();
+            }
+            Err(e) => {
+                self.set_error(format!("Failed to load users: {}", e));
+            }
+        }
+
+        // ルーム一覧を取得
+        match self.api_client.get_rooms().await {
+            Ok(api_rooms) => {
+                self.rooms = api_rooms.into_iter().map(|r| r.into()).collect();
+                // 現在のルームインデックスを調整
+                if self.current_room >= self.rooms.len() {
+                    self.current_room = 0;
+                }
+            }
+            Err(e) => {
+                self.set_error(format!("Failed to load rooms: {}", e));
+            }
+        }
+
+        // 現在のルームのメッセージを取得
+        if let Some(room) = self.rooms.get(self.current_room) {
+            if let Some(ref room_id) = room.id {
+                match self.api_client.get_messages(Some(room_id)).await {
+                    Ok(api_messages) => {
+                        self.messages = api_messages.into_iter().map(|m| m.into()).collect();
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Failed to load messages: {}", e));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    // WebSocketメッセージを処理
+    pub async fn handle_websocket_message(&mut self) {
+        if let Some(ws_message) = self.websocket_client.receive_message().await {
+            match ws_message.r#type.as_str() {
+                "knock" => {
+                    if let Some(sender_name) = ws_message.user_id {
+                        self.notification = Some(format!("🚪 {} is knocking!", sender_name));
+                        // ノック音を再生（既存の機能）
+                        self.knock(&sender_name);
+                    }
+                }
+                "message" => {
+                    if let (Some(content), Some(sender_id)) = (ws_message.content, ws_message.user_id) {
+                        // 新しいメッセージを追加（実際の実装では、メッセージ履歴を再取得する方が良い）
+                        let sender_name = self.users.iter()
+                            .find(|u| u.id.as_ref() == Some(&sender_id))
+                            .map(|u| u.name.clone())
+                            .unwrap_or_else(|| "Unknown".to_string());
+
+                        let room_name = if let Some(room_id) = ws_message.room_id {
+                            self.rooms.iter()
+                                .find(|r| r.id.as_ref() == Some(&room_id))
+                                .map(|r| r.name.clone())
+                                .unwrap_or_else(|| "Unknown Room".to_string())
+                        } else {
+                            "Direct Message".to_string()
+                        };
+
+                        let message = Message::new(sender_name, content, room_name);
+                        self.messages.push(message);
+                    }
+                }
+                "user_status" => {
+                    if let (Some(user_id), Some(status)) = (ws_message.user_id, ws_message.status) {
+                        // ユーザーステータスを更新
+                        if let Some(user) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(&user_id)) {
+                            let new_status = match status.as_str() {
+                                "online" => UserStatus::Online,
+                                "away" => UserStatus::Away,
+                                "busy" => UserStatus::Busy,
+                                _ => UserStatus::Offline,
+                            };
+                            user.update_status(new_status);
+                        }
+                    }
+                }
+                _ => {
+                    // 未知のメッセージタイプは無視
+                }
+            }
         }
     }
 
@@ -122,7 +279,7 @@ impl App {
                     },
                     KeyCode::Down | KeyCode::Char('j') => self.handle_down_key(),
                     KeyCode::Up | KeyCode::Char('k') => self.handle_up_key(),
-                    KeyCode::Enter => self.handle_enter_key(),
+                    KeyCode::Enter | KeyCode::Char(' ') => self.handle_confirm_key(),
                     KeyCode::Char('i') => {
                         if self.focused_pane == PaneIdentifier::Messages ||
                            self.focused_pane == PaneIdentifier::Rooms ||
@@ -131,6 +288,20 @@ impl App {
                             self.input.clear();
                             self.error = None;
                             self.notification = None;
+                        }
+                    },
+                    KeyCode::Char('n') => {
+                        // ノック機能
+                        if self.focused_pane == PaneIdentifier::Users {
+                            if let Some(user) = self.get_selected_user() {
+                                if let (Some(sender_id), Some(target_id)) = (&self.current_user.id, &user.id) {
+                                    if let Err(e) = self.websocket_client.send_knock(sender_id, target_id) {
+                                        self.set_error(format!("Failed to send knock: {}", e));
+                                    } else {
+                                        self.notification = Some(format!("Knocked on {}", user.name));
+                                    }
+                                }
+                            }
                         }
                     },
                     _ => {}
@@ -148,11 +319,8 @@ impl App {
                                 if input_clone.starts_with("nok @") {
                                     self.handle_command(&input_clone);
                                 } else {
-                                    let sender_name = self.current_user.name.clone();
-                                    let room_name = self.rooms.get(self.current_room)
-                                        .map_or_else(|| "Unknown Room".to_string(), |r| r.name.clone());
-                                    let new_message = Message::new(sender_name, input_clone, room_name);
-                                    self.messages.push(new_message);
+                                    // メッセージを送信
+                                    self.send_message(&input_clone);
                                 }
                             }
                         }
@@ -170,6 +338,20 @@ impl App {
                     _ => {}
                 }
             },
+        }
+    }
+
+    // メッセージ送信
+    pub fn send_message(&mut self, content: &str) {
+        if let Some(room) = self.rooms.get(self.current_room) {
+            if let (Some(sender_id), Some(room_id)) = (&self.current_user.id, &room.id) {
+                if let Err(e) = self.websocket_client.send_room_message(sender_id, room_id, content) {
+                    self.set_error(format!("Failed to send message: {}", e));
+                    return;
+                }
+                // メッセージ送信成功時は通知を表示
+                self.notification = Some("Message sent!".to_string());
+            }
         }
     }
 
@@ -198,12 +380,15 @@ impl App {
             }
             PaneIdentifier::Users => {
                 if !self.users.is_empty() {
-                    let current_selected = self.selected_user.unwrap_or(0);
-                    self.selected_user = Some((current_selected + 1) % self.users.len());
+                    let current = self.selected_user.unwrap_or(0);
+                    self.selected_user = Some((current + 1) % self.users.len());
                 }
             }
             PaneIdentifier::Messages => {
-                // TODO: Implement message scrolling/selection down
+                if !self.messages.is_empty() {
+                    let current = self.selected_message_idx.unwrap_or(0);
+                    self.selected_message_idx = Some((current + 1) % self.messages.len());
+                }
             }
             _ => {}
         }
@@ -213,58 +398,67 @@ impl App {
         match self.focused_pane {
             PaneIdentifier::Rooms => {
                 if !self.rooms.is_empty() {
-                    if self.selected_room_idx == 0 {
-                        self.selected_room_idx = self.rooms.len() - 1;
+                    self.selected_room_idx = if self.selected_room_idx == 0 {
+                        self.rooms.len() - 1
                     } else {
-                        self.selected_room_idx -= 1;
-                    }
+                        self.selected_room_idx - 1
+                    };
                 }
             }
             PaneIdentifier::Users => {
                 if !self.users.is_empty() {
-                    let current_selected = self.selected_user.unwrap_or(0);
-                    if current_selected == 0 {
-                        self.selected_user = Some(self.users.len() - 1);
+                    let current = self.selected_user.unwrap_or(0);
+                    self.selected_user = Some(if current == 0 {
+                        self.users.len() - 1
                     } else {
-                        self.selected_user = Some(current_selected - 1);
-                    }
+                        current - 1
+                    });
                 }
             }
             PaneIdentifier::Messages => {
-                // TODO: Implement message scrolling/selection up
+                if !self.messages.is_empty() {
+                    let current = self.selected_message_idx.unwrap_or(0);
+                    self.selected_message_idx = Some(if current == 0 {
+                        self.messages.len() - 1
+                    } else {
+                        current - 1
+                    });
+                }
             }
             _ => {}
         }
     }
 
-    fn handle_enter_key(&mut self) {
+    fn handle_confirm_key(&mut self) {
         match self.focused_pane {
             PaneIdentifier::Rooms => {
+                // ルームを変更して、そのルームに参加
                 self.current_room = self.selected_room_idx;
-                self.notification = Some(format!("Joined room: {}", self.rooms[self.current_room].name));
-            }
-            PaneIdentifier::Users => {
-                if let Some(user_idx) = self.selected_user {
-                    self.notification = Some(format!("Selected user: {}", self.users[user_idx].name));
+                if let Some(room) = self.rooms.get(self.current_room) {
+                    if let (Some(user_id), Some(room_id)) = (&self.current_user.id, &room.id) {
+                        if let Err(e) = self.websocket_client.join_room(user_id, room_id) {
+                            self.set_error(format!("Failed to join room: {}", e));
+                        } else {
+                            self.notification = Some(format!("Joined {}", room.name));
+                            // メッセージを再読み込み（実際の実装では非同期で行う）
+                        }
+                    }
                 }
-            }
-            PaneIdentifier::Messages => {
-                // TODO: Implement action for selecting a message (e.g., reply, react)
             }
             _ => {}
         }
     }
 
     pub fn tick(&mut self) {
-        // Update app state on tick
+        // Placeholder for any periodic updates
     }
 
     pub fn knock(&mut self, target_user: &str) {
-        // Implement the knock functionality
-        self.notification = Some(format!("░░░ KON KON ░░░\n> {}さんのドアをノックしました。", target_user));
-
-        // Here we would play the knock sound
-        // audio::play_knock_sound();
+        self.notification = Some(format!("Knocked on {}", target_user));
+        // Play knock sound
+        if let Err(_) = crate::audio::play_knock_sound() {
+            // Silently handle audio errors
+        }
     }
 
     pub fn get_selected_user(&self) -> Option<&User> {
@@ -277,28 +471,24 @@ impl App {
 
     pub fn select_next_user(&mut self) {
         if !self.users.is_empty() {
-            let new_idx = match self.selected_user {
-                Some(idx) => (idx + 1) % self.users.len(),
-                None => 0,
-            };
-            self.selected_user = Some(new_idx);
+            let current = self.selected_user.unwrap_or(0);
+            self.selected_user = Some((current + 1) % self.users.len());
         }
     }
 
     pub fn handle_command(&mut self, input: &str) {
         if input.starts_with("nok @") {
-            let username = input.trim_start_matches("nok @").trim();
-            let user_exists = self.users.iter().any(|u| u.name == username);
-
-            if user_exists {
-                self.knock(username);
-
-                // Play knock sound
-                if let Err(e) = crate::audio::play_knock_sound() {
-                    self.set_error(format!("Failed to play sound: {}", e));
+            let target = input.trim_start_matches("nok @").trim();
+            if let Some(user) = self.users.iter().find(|u| u.name == target) {
+                if let (Some(sender_id), Some(target_id)) = (&self.current_user.id, &user.id) {
+                    if let Err(e) = self.websocket_client.send_knock(sender_id, target_id) {
+                        self.set_error(format!("Failed to send knock: {}", e));
+                    } else {
+                        self.notification = Some(format!("Knocked on {}", target));
+                    }
                 }
             } else {
-                self.set_error(format!("User '{}' not found", username));
+                self.set_error(format!("User '{}' not found", target));
             }
         }
     }

@@ -142,7 +142,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         f.render_widget(input_paragraph, input_area);
     }
 
-    // --- Render ASCII Art Pane (Right Pane) --- Simplified for debugging ---
+    // --- Render ASCII Art Pane (Right Pane) ---
     let ascii_art_block_instance = Block::default()
         .title("Room Visualizer")
         .borders(Borders::ALL)
@@ -155,32 +155,106 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let content_area = ascii_art_block_instance.inner(right_pane_area);
     f.render_widget(ascii_art_block_instance, right_pane_area);
 
-    let mut test_lines: Vec<Line> = Vec::new();
-    let room_name_for_display = app.rooms.get(app.current_room).map_or("Unknown", |r| &r.name);
-    let room_name_line = format!("+---[ {} ]---+", room_name_for_display);
-    test_lines.push(Line::from(Span::styled(room_name_line, Style::default().fg(Color::Yellow))));
+    // Generate ASCII art for multiple rooms with simple dot representation
+    let mut ascii_lines: Vec<Line> = Vec::new();
 
-    let line1_content = "User A (^^)";
-    let line2_content = "Mid Content";
-    let line3_content = "User B (..)";
+    // Calculate room box dimensions
+    let available_width = content_area.width as usize;
+    let room_width = 16; // Width of each room box
+    let rooms_per_row = (available_width / (room_width + 2)).max(1); // +2 for spacing
 
-    let display_width = content_area.width.saturating_sub(4).max(1) as usize;
+    // Create room representations
+    for (room_idx, _room) in app.rooms.iter().enumerate() {
+        if room_idx == 0 {
+            // Top border line
+            let mut top_line = String::new();
+            for i in 0..rooms_per_row.min(app.rooms.len()) {
+                if i > 0 {
+                    top_line.push_str("  ");
+                }
+                top_line.push_str(&format!("+{}+", "-".repeat(room_width - 2)));
+            }
+            ascii_lines.push(Line::from(top_line));
 
-    test_lines.push(Line::from(format!("| {:^width$} |", line1_content, width = display_width)));
-    test_lines.push(Line::from(format!("| {:^width$} |", line2_content, width = display_width)));
-    test_lines.push(Line::from(format!("| {:^width$} |", line3_content, width = display_width)));
+            // Room name line
+            let mut name_line = String::new();
+            for i in 0..rooms_per_row.min(app.rooms.len()) {
+                if i > 0 {
+                    name_line.push_str("  ");
+                }
+                let room_name = &app.rooms[i].name;
+                let truncated_name = if room_name.len() > room_width - 4 {
+                    &room_name[..room_width - 4]
+                } else {
+                    room_name
+                };
+                name_line.push_str(&format!("|{:^width$}|", truncated_name, width = room_width - 2));
+            }
+            ascii_lines.push(Line::from(name_line));
 
-    for _ in 0..(content_area.height.saturating_sub(test_lines.len() as u16).saturating_sub(1).max(0)) {
-         test_lines.push(Line::from(format!("| {:^width$} |", "", width = display_width)));
+            // Empty line
+            let mut empty_line = String::new();
+            for i in 0..rooms_per_row.min(app.rooms.len()) {
+                if i > 0 {
+                    empty_line.push_str("  ");
+                }
+                empty_line.push_str(&format!("|{:^width$}|", "", width = room_width - 2));
+            }
+            ascii_lines.push(Line::from(empty_line.clone()));
+
+            // User dots line
+            let mut users_line = String::new();
+            for i in 0..rooms_per_row.min(app.rooms.len()) {
+                if i > 0 {
+                    users_line.push_str("  ");
+                }
+
+                // Generate user dots for this room
+                let mut dots = String::new();
+                let max_dots = room_width - 4; // Each dot takes 1 char
+                let user_count = app.users.len().min(max_dots);
+
+                for j in 0..user_count {
+                    if j > 0 && j % 2 == 0 {
+                        dots.push(' '); // Add space every 2 dots for readability
+                    }
+                    dots.push('.');
+                }
+
+                users_line.push_str(&format!("|{:^width$}|", dots, width = room_width - 2));
+            }
+            ascii_lines.push(Line::from(users_line));
+
+            // Another empty line
+            ascii_lines.push(Line::from(empty_line));
+
+            // Bottom border line
+            let mut bottom_line = String::new();
+            for i in 0..rooms_per_row.min(app.rooms.len()) {
+                if i > 0 {
+                    bottom_line.push_str("  ");
+                }
+                bottom_line.push_str(&format!("+{}+", "-".repeat(room_width - 2)));
+            }
+            ascii_lines.push(Line::from(bottom_line));
+
+            break; // For now, just show one row of rooms
+        }
     }
 
-    let bottom_border_content_len = room_name_for_display.len() + 8; // Length of content within +---+ e.g. "---[ Room Name ]---"
-    let bottom_border_line = format!("+{}+", "-".repeat(bottom_border_content_len));
-    test_lines.push(Line::from(Span::styled(bottom_border_line, Style::default().fg(Color::Yellow))));
+    // If no rooms, show a placeholder
+    if app.rooms.is_empty() {
+        ascii_lines.push(Line::from("+----------------+"));
+        ascii_lines.push(Line::from("|   No Rooms     |"));
+        ascii_lines.push(Line::from("|                |"));
+        ascii_lines.push(Line::from("|                |"));
+        ascii_lines.push(Line::from("|                |"));
+        ascii_lines.push(Line::from("+----------------+"));
+    }
 
-    let ascii_art_paragraph = Paragraph::new(test_lines)
+    let ascii_art_paragraph = Paragraph::new(ascii_lines)
         .wrap(Wrap { trim: false })
-        .alignment(ratatui::layout::Alignment::Center);
+        .alignment(ratatui::layout::Alignment::Left);
 
     f.render_widget(ascii_art_paragraph, content_area);
 

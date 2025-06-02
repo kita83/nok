@@ -2,6 +2,7 @@ mod app;
 mod ui;
 mod audio;
 mod util;
+mod api;
 
 use std::io;
 use std::time::Duration;
@@ -15,11 +16,13 @@ use ratatui::{
     backend::CrosstermBackend,
     Terminal,
 };
+use tokio::time::interval;
 
 use app::App;
 use ui::{ui, TabView};
 
-fn main() -> Result<(), io::Error> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -28,10 +31,35 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     // Create app state
-    let app = App::new();
+    let mut app = App::new();
+
+    // Try to connect to backend (but continue even if it fails)
+    match app.initialize_connection().await {
+        Ok(_) => {
+            // Show connection success
+            app.notification = Some("Connected to backend!".to_string());
+        }
+        Err(e) => {
+            // Restore terminal before showing error
+            disable_raw_mode()?;
+            execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            )?;
+            terminal.show_cursor()?;
+
+            eprintln!("❌ Failed to connect to backend: {}", e);
+            eprintln!("💡 Make sure the backend is running on port 8001:");
+            eprintln!("   cd backend && python main.py");
+            eprintln!("📚 See backend/README.md for setup instructions");
+
+            return Ok(());
+        }
+    }
 
     // Run app
-    let res = run_app(&mut terminal, app);
+    let res = run_app(&mut terminal, app).await;
 
     // Restore terminal
     disable_raw_mode()?;
@@ -49,56 +77,65 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn run_app<B: ratatui::backend::Backend>(
+async fn run_app<B: ratatui::backend::Backend>(
     terminal: &mut Terminal<B>,
     mut app: App,
-) -> io::Result<()> {
-    let tick_rate = Duration::from_millis(100);
-    let mut last_tick = std::time::Instant::now();
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut tick_interval = interval(Duration::from_millis(100));
+    let mut websocket_interval = interval(Duration::from_millis(50)); // WebSocketメッセージチェック用
 
     loop {
-        terminal.draw(|f| ui(f, &mut app))?;
+        tokio::select! {
+            // ターミナル描画とキー入力処理
+            _ = tick_interval.tick() => {
+                // UI描画
+                terminal.draw(|f| ui(f, &mut app))?;
 
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-
-        if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Char('n') => {
-                        if app.focused_pane == app::PaneIdentifier::Users {
-                            if let Some(user_idx) = app.selected_user {
-                                // Ensure the user_idx is valid before trying to access app.users[user_idx]
-                                if let Some(user) = app.users.get(user_idx) {
-                                    let username = user.name.clone();
-                                    app.knock(&username);
-                                    // Play knock sound
-                                    if let Err(e) = audio::play_knock_sound() {
-                                        app.set_error(format!("Failed to play sound: {}", e));
+                // キー入力チェック
+                if crossterm::event::poll(Duration::from_millis(0))? {
+                    if let Event::Key(key) = event::read()? {
+                        match key.code {
+                            KeyCode::Char('q') => return Ok(()),
+                            KeyCode::Char('n') => {
+                                if app.focused_pane == app::PaneIdentifier::Users {
+                                    if let Some(user) = app.get_selected_user() {
+                                        let username = user.name.clone();
+                                        if let (Some(sender_id), Some(target_id)) = (&app.current_user.id, &user.id) {
+                                            if let Err(e) = app.websocket_client.send_knock(sender_id, target_id) {
+                                                app.set_error(format!("Failed to send knock: {}", e));
+                                            } else {
+                                                app.notification = Some(format!("Knocked on {}", username));
+                                                // Play knock sound
+                                                if let Err(_) = audio::play_knock_sound() {
+                                                    // Silently handle audio errors
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        app.set_error("No user selected to knock.".to_string());
                                     }
-                                } else {
-                                    // This case should ideally not happen if selected_user is managed correctly
-                                    app.set_error("Selected user index is out of bounds.".to_string());
                                 }
-                            } else {
-                                app.set_error("No user selected to knock.".to_string());
-                            }
-                        } else {
-                            // Optionally, provide feedback if 'n' is pressed outside Users pane focus
-                            // app.set_error("Switch to Users pane (Tab or 'u') and select a user to knock ('n').".to_string());
-                            // For now, do nothing if not in Users pane focus, to avoid spamming errors
+                            },
+                            KeyCode::Char('r') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                // Ctrl+R でデータリフレッシュ
+                                if let Err(e) = app.refresh_data().await {
+                                    app.set_error(format!("Failed to refresh data: {}", e));
+                                } else {
+                                    app.notification = Some("Data refreshed!".to_string());
+                                }
+                            },
+                            _ => app.handle_key(key),
                         }
-                    },
-                    _ => app.handle_key(key),
+                    }
                 }
-            }
-        }
 
-        if last_tick.elapsed() >= tick_rate {
-            app.tick();
-            last_tick = std::time::Instant::now();
+                app.tick();
+            }
+
+            // WebSocketメッセージ処理
+            _ = websocket_interval.tick() => {
+                app.handle_websocket_message().await;
+            }
         }
     }
 }
