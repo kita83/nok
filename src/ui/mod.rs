@@ -1,8 +1,8 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Padding, Paragraph, Wrap},
+
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 
@@ -18,6 +18,15 @@ pub enum TabView {
 pub fn ui(f: &mut Frame, app: &mut App) {
     let size = f.size();
 
+    // ターミナルサイズチェック
+    if size.width < 20 || size.height < 10 {
+        let error_paragraph = Paragraph::new("Terminal too small!\nMinimum: 20x10")
+            .style(Style::default().fg(Color::Red))
+            .wrap(Wrap { trim: true });
+        f.render_widget(error_paragraph, size);
+        return;
+    }
+
     // Main layout: two horizontal panes (left and right)
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -31,9 +40,9 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     let left_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(30), // Rooms
-            Constraint::Percentage(30), // Users
-            Constraint::Percentage(40), // Messages
+            Constraint::Length(8),      // Rooms - 固定行数
+            Constraint::Length(8),      // Users - 固定行数
+            Constraint::Min(4),         // Messages - 残りの領域
         ].as_ref())
         .split(left_pane_area);
 
@@ -49,27 +58,41 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default().fg(Color::White)
-        })
-        .padding(Padding::uniform(1));
+        });
     let actual_rooms_content_area = rooms_block.inner(rooms_area);
     f.render_widget(rooms_block, rooms_area);
-    let room_items: Vec<ListItem> = app.rooms.iter().enumerate().map(|(i, r)| {
-        let style = if app.focused_pane == PaneIdentifier::Rooms && i == app.selected_room_idx {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-        } else if i == app.current_room {
+
+        let room_items: Vec<ListItem> = app.rooms.iter().enumerate().map(|(i, r)| {
+        let content = if i == app.current_room {
+            format!("* {}", r.name)
+        } else {
+            format!("  {}", r.name)  // インデントを統一
+        };
+        // 現在のルームだけ色を変える（選択状態はListStateに任せる）
+        let style = if i == app.current_room {
             Style::default().fg(Color::Yellow)
         } else {
             Style::default().fg(Color::White)
         };
-        let content = if i == app.current_room {
-            format!("* {}", r.name)
-        } else {
-            r.name.clone()
-        };
-        ListItem::new(Span::styled(content, style))
+        ListItem::new(content).style(style)
     }).collect();
-    let rooms_list = List::new(room_items);
-    f.render_widget(rooms_list, actual_rooms_content_area);
+
+        let rooms_list = List::new(room_items)
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan))
+        .highlight_symbol("> ");
+
+    let mut rooms_state = ListState::default();
+    if app.focused_pane == PaneIdentifier::Rooms && !app.rooms.is_empty() {
+        // 範囲チェックを追加
+        let safe_idx = if app.selected_room_idx < app.rooms.len() {
+            app.selected_room_idx
+        } else {
+            0
+        };
+        rooms_state.select(Some(safe_idx));
+    }
+
+    f.render_stateful_widget(rooms_list, actual_rooms_content_area, &mut rooms_state);
 
     // --- Render Users Pane ---
     let users_block = Block::default()
@@ -79,26 +102,56 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default().fg(Color::White)
-        })
-        .padding(Padding::uniform(1));
+        });
     let actual_users_content_area = users_block.inner(users_area);
     f.render_widget(users_block, users_area);
-    let user_items: Vec<ListItem> = app.users.iter().enumerate().map(|(i, u)| {
-        let status_symbol = match u.status {
-            crate::app::user::UserStatus::Online => Span::styled("● ", Style::default().fg(Color::Green)),
-            crate::app::user::UserStatus::Away => Span::styled("○ ", Style::default().fg(Color::Yellow)),
-            crate::app::user::UserStatus::Busy => Span::styled("◆ ", Style::default().fg(Color::Red)),
-            crate::app::user::UserStatus::Offline => Span::styled("◇ ", Style::default().fg(Color::Gray)),
+
+    let user_items: Vec<ListItem> = app.users.iter().enumerate().map(|(_i, u)| {
+        let status_char = match u.status {
+            crate::app::user::UserStatus::Online => "●",
+            crate::app::user::UserStatus::Away => "○",
+            crate::app::user::UserStatus::Busy => "◆",
+            crate::app::user::UserStatus::Offline => "◇",
         };
-        let name_style = if app.focused_pane == PaneIdentifier::Users && app.selected_user == Some(i) {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        let status_color = match u.status {
+            crate::app::user::UserStatus::Online => Color::Green,
+            crate::app::user::UserStatus::Away => Color::Yellow,
+            crate::app::user::UserStatus::Busy => Color::Red,
+            crate::app::user::UserStatus::Offline => Color::Gray,
+        };
+
+        // ユーザーの所属部屋を取得
+        let room_names = u.get_room_names(&app.rooms);
+        let rooms_display = if room_names.is_empty() {
+            "".to_string()
+        } else if room_names.len() == 1 {
+            format!(" [{}]", room_names[0])
         } else {
-            Style::default().fg(Color::White)
+            format!(" [{}]", room_names.join(", "))
         };
-        ListItem::new(Line::from(vec![status_symbol, Span::styled(&u.name, name_style)]))
+
+        let content = format!("{} {}{}", status_char, u.name, rooms_display);
+        ListItem::new(content).style(Style::default().fg(status_color))
     }).collect();
-    let users_list = List::new(user_items);
-    f.render_widget(users_list, actual_users_content_area);
+
+    let users_list = List::new(user_items)
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan))
+        .highlight_symbol("> ");
+
+    let mut users_state = ListState::default();
+    if app.focused_pane == PaneIdentifier::Users && !app.users.is_empty() {
+        if let Some(selected) = app.selected_user {
+            // 範囲チェックを追加
+            let safe_idx = if selected < app.users.len() {
+                selected
+            } else {
+                0
+            };
+            users_state.select(Some(safe_idx));
+        }
+    }
+
+    f.render_stateful_widget(users_list, actual_users_content_area, &mut users_state);
 
     // --- Render Messages Pane ---
     let messages_block = Block::default()
@@ -108,8 +161,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default().fg(Color::White)
-        })
-        .padding(Padding::uniform(1));
+        });
     let (actual_messages_content_area, input_display_area) =
         if app.state == AppState::Input && app.focused_pane == PaneIdentifier::Messages {
             let temp_messages_block_for_inner_calc = messages_block.clone();
@@ -125,16 +177,32 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             (messages_block.inner(messages_area), None)
         };
     f.render_widget(messages_block, messages_area);
+
     let message_items: Vec<ListItem> = app.messages.iter().map(|m| {
         let time_str = m.formatted_time();
-        ListItem::new(Line::from(vec![
-            Span::styled(format!("[{}] ", time_str), Style::default().fg(Color::DarkGray)),
-            Span::styled(format!("<{}>: ", m.sender), Style::default().fg(Color::Yellow)),
-            Span::raw(&m.content),
-        ]))
+        let content = format!("[{}] <{}>: {}", time_str, m.sender, m.content);
+        ListItem::new(content).style(Style::default().fg(Color::White))
     }).collect();
-    let messages_list = List::new(message_items);
-    f.render_widget(messages_list, actual_messages_content_area);
+
+    let messages_list = List::new(message_items)
+        .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan))
+        .highlight_symbol("> ");
+
+    let mut messages_state = ListState::default();
+    if app.focused_pane == PaneIdentifier::Messages && !app.messages.is_empty() {
+        if let Some(selected) = app.selected_message_idx {
+            // 範囲チェックを追加
+            let safe_idx = if selected < app.messages.len() {
+                selected
+            } else {
+                0
+            };
+            messages_state.select(Some(safe_idx));
+        }
+    }
+
+    f.render_stateful_widget(messages_list, actual_messages_content_area, &mut messages_state);
+
     if let Some(input_area) = input_display_area {
         let input_text = format!("> {}", app.input);
         let input_paragraph = Paragraph::new(input_text)
@@ -142,8 +210,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         f.render_widget(input_paragraph, input_area);
     }
 
-    // --- Render ASCII Art Pane (Right Pane) ---
-    let ascii_art_block_instance = Block::default()
+    // --- Render Right Pane (Room Visualizer) ---
+    let right_block = Block::default()
         .title("Room Visualizer")
         .borders(Borders::ALL)
         .border_style(if app.focused_pane == PaneIdentifier::AsciiArt {
@@ -152,154 +220,46 @@ pub fn ui(f: &mut Frame, app: &mut App) {
             Style::default().fg(Color::White)
         });
 
-    let content_area = ascii_art_block_instance.inner(right_pane_area);
-    f.render_widget(ascii_art_block_instance, right_pane_area);
+    let content_area = right_block.inner(right_pane_area);
+    f.render_widget(right_block, right_pane_area);
 
-    // Generate ASCII art for multiple rooms with simple dot representation
-    let mut ascii_lines: Vec<Line> = Vec::new();
+    // Status information for the right pane
+    let mut status_text = format!("Terminal: {}x{}\nConnection: {:?}\nFocus: {:?}",
+                             size.width, size.height,
+                             app.connection_status,
+                             app.focused_pane);
 
-    // Calculate room box dimensions
-    let available_width = content_area.width as usize;
-    let room_width = 16; // Width of each room box
-    let rooms_per_row = (available_width / (room_width + 2)).max(1); // +2 for spacing
+    // ターミナル環境の詳細情報を追加
+    status_text.push_str(&format!("\n\nTerminal Info:"));
+    status_text.push_str(&format!("\nTERM: {}", std::env::var("TERM").unwrap_or_else(|_| "unknown".to_string())));
+    status_text.push_str(&format!("\nTERM_PROGRAM: {}", std::env::var("TERM_PROGRAM").unwrap_or_else(|_| "unknown".to_string())));
+    status_text.push_str(&format!("\nCOLORTERM: {}", std::env::var("COLORTERM").unwrap_or_else(|_| "unknown".to_string())));
 
-    // Create room representations
-    for (room_idx, _room) in app.rooms.iter().enumerate() {
-        if room_idx == 0 {
-            // Top border line
-            let mut top_line = String::new();
-            for i in 0..rooms_per_row.min(app.rooms.len()) {
-                if i > 0 {
-                    top_line.push_str("  ");
-                }
-                top_line.push_str(&format!("+{}+", "-".repeat(room_width - 2)));
-            }
-            ascii_lines.push(Line::from(top_line));
-
-            // Room name line
-            let mut name_line = String::new();
-            for i in 0..rooms_per_row.min(app.rooms.len()) {
-                if i > 0 {
-                    name_line.push_str("  ");
-                }
-                let room_name = &app.rooms[i].name;
-                let truncated_name = if room_name.len() > room_width - 4 {
-                    &room_name[..room_width - 4]
-                } else {
-                    room_name
-                };
-                name_line.push_str(&format!("|{:^width$}|", truncated_name, width = room_width - 2));
-            }
-            ascii_lines.push(Line::from(name_line));
-
-            // Empty line
-            let mut empty_line = String::new();
-            for i in 0..rooms_per_row.min(app.rooms.len()) {
-                if i > 0 {
-                    empty_line.push_str("  ");
-                }
-                empty_line.push_str(&format!("|{:^width$}|", "", width = room_width - 2));
-            }
-            ascii_lines.push(Line::from(empty_line.clone()));
-
-            // User dots line
-            let mut users_line = String::new();
-            for i in 0..rooms_per_row.min(app.rooms.len()) {
-                if i > 0 {
-                    users_line.push_str("  ");
-                }
-
-                // Generate user dots for this room
-                let mut dots = String::new();
-                let max_dots = room_width - 4; // Each dot takes 1 char
-                let user_count = app.users.len().min(max_dots);
-
-                for j in 0..user_count {
-                    if j > 0 && j % 2 == 0 {
-                        dots.push(' '); // Add space every 2 dots for readability
-                    }
-                    dots.push('.');
-                }
-
-                users_line.push_str(&format!("|{:^width$}|", dots, width = room_width - 2));
-            }
-            ascii_lines.push(Line::from(users_line));
-
-            // Another empty line
-            ascii_lines.push(Line::from(empty_line));
-
-            // Bottom border line
-            let mut bottom_line = String::new();
-            for i in 0..rooms_per_row.min(app.rooms.len()) {
-                if i > 0 {
-                    bottom_line.push_str("  ");
-                }
-                bottom_line.push_str(&format!("+{}+", "-".repeat(room_width - 2)));
-            }
-            ascii_lines.push(Line::from(bottom_line));
-
-            break; // For now, just show one row of rooms
-        }
+    // Add room info if available
+    if !app.rooms.is_empty() && app.current_room < app.rooms.len() {
+        status_text.push_str(&format!("\n\nCurrent Room: {}", app.rooms[app.current_room].name));
     }
 
-    // If no rooms, show a placeholder
-    if app.rooms.is_empty() {
-        ascii_lines.push(Line::from("+----------------+"));
-        ascii_lines.push(Line::from("|   No Rooms     |"));
-        ascii_lines.push(Line::from("|                |"));
-        ascii_lines.push(Line::from("|                |"));
-        ascii_lines.push(Line::from("|                |"));
-        ascii_lines.push(Line::from("+----------------+"));
+    // Add controls
+    status_text.push_str("\n\nControls:");
+    status_text.push_str("\nTab: Switch focus");
+    status_text.push_str("\n↑↓: Navigate");
+    status_text.push_str("\nEnter: Select");
+    status_text.push_str("\nn: Knock (Users)");
+    status_text.push_str("\nq: Quit");
+
+    // Show notifications if any
+    if let Some(ref notification) = app.notification {
+        status_text.push_str(&format!("\n\n✅ {}", notification));
     }
 
-    let ascii_art_paragraph = Paragraph::new(ascii_lines)
-        .wrap(Wrap { trim: false })
-        .alignment(ratatui::layout::Alignment::Left);
+    // Show errors if any
+    if let Some(ref error) = app.error {
+        status_text.push_str(&format!("\n\n❌ {}", error));
+    }
 
-    f.render_widget(ascii_art_paragraph, content_area);
-
-    // --- Display Global Notifications/Errors ---
-    let mut bottom_line_occupied = false;
-    if app.state == AppState::Input && input_display_area.is_some() {
-        bottom_line_occupied = true;
-    }
-    if !bottom_line_occupied {
-        if let Some(notification) = &app.notification {
-            let notif_area = Rect {
-                x: size.x,
-                y: size.height.saturating_sub(1),
-                width: size.width,
-                height: 1,
-            };
-            let notif_text = format!("KON KON: {}", notification);
-            let notif_paragraph = Paragraph::new(notif_text)
-                .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD).bg(Color::Black));
-            f.render_widget(notif_paragraph, notif_area);
-            bottom_line_occupied = true;
-        } else if let Some(error) = &app.error {
-            let error_area = Rect {
-                x: size.x,
-                y: size.height.saturating_sub(1),
-                width: size.width,
-                height: 1,
-            };
-            let error_text = format!("ERROR: {}", error);
-            let error_paragraph = Paragraph::new(error_text)
-                .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD).bg(Color::Black));
-            f.render_widget(error_paragraph, error_area);
-            bottom_line_occupied = true;
-        }
-    }
-    if app.state == AppState::Input && input_display_area.is_none() && !bottom_line_occupied {
-         let input_area = Rect {
-            x: size.x,
-            y: size.height.saturating_sub(1),
-            width: size.width,
-            height: 1,
-        };
-        let input_text = format!("Input: {}", app.input);
-        let input_paragraph = Paragraph::new(input_text)
-            .style(Style::default().fg(Color::Yellow).bg(Color::Black));
-        f.render_widget(input_paragraph, input_area);
-    }
+    let status_paragraph = Paragraph::new(status_text)
+        .style(Style::default().fg(Color::Green))
+        .wrap(Wrap { trim: true });
+    f.render_widget(status_paragraph, content_area);
 }

@@ -102,8 +102,8 @@ impl ApiClient {
         Ok(user)
     }
 
-    pub async fn send_message(&self, content: &str, room_id: Option<&str>, target_user_id: Option<&str>) -> Result<ApiMessage, Box<dyn Error>> {
-        let url = format!("{}/api/messages/", self.base_url);
+    pub async fn send_message(&self, sender_id: &str, content: &str, room_id: Option<&str>, target_user_id: Option<&str>) -> Result<ApiMessage, Box<dyn Error>> {
+        let url = format!("{}/api/messages/?sender_id={}", self.base_url, sender_id);
         let new_message = CreateMessage {
             content: content.to_string(),
             message_type: "text".to_string(),
@@ -116,7 +116,7 @@ impl ApiClient {
     }
 
     pub async fn send_knock(&self, sender_id: &str, target_user_id: &str) -> Result<ApiMessage, Box<dyn Error>> {
-        let url = format!("{}/api/messages/", self.base_url);
+        let url = format!("{}/api/messages/?sender_id={}", self.base_url, sender_id);
         let knock_message = CreateMessage {
             content: "kon kon".to_string(),
             message_type: "knock".to_string(),
@@ -137,6 +137,24 @@ impl ApiClient {
         } else {
             Err(format!("Failed to join room: {}", response.status()).into())
         }
+    }
+
+    pub async fn get_room_members(&self, room_id: &str) -> Result<Vec<ApiUser>, Box<dyn Error>> {
+        let url = format!("{}/api/rooms/{}/members", self.base_url, room_id);
+        let response = self.client.get(&url).send().await?;
+        let members: Vec<serde_json::Value> = response.json().await?;
+
+        // レスポンスからApiUserに変換
+        let api_users: Result<Vec<ApiUser>, _> = members.into_iter().map(|member| {
+            Ok(ApiUser {
+                id: member["id"].as_str().unwrap_or("").to_string(),
+                name: member["name"].as_str().unwrap_or("").to_string(),
+                status: member["status"].as_str().unwrap_or("offline").to_string(),
+                created_at: member.get("created_at").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            })
+        }).collect();
+
+        api_users
     }
 
     pub async fn health_check(&self) -> Result<bool, Box<dyn Error>> {

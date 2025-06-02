@@ -32,6 +32,7 @@ class EventDispatcher:
             )
             session.add(knock_message)
             await session.commit()
+            await session.refresh(knock_message)  # created_at を取得
 
             # WebSocketでターゲットユーザーに送信
             message = {
@@ -70,6 +71,7 @@ class EventDispatcher:
             )
             session.add(message_record)
             await session.commit()
+            await session.refresh(message_record)
 
             # WebSocketでルーム内の全ユーザーに送信
             message = {

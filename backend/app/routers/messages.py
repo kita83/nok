@@ -68,7 +68,9 @@ async def get_message(message_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=MessageResponse)
 async def create_message(
-    message_data: MessageCreate, sender_id: str, db: AsyncSession = Depends(get_db)
+    message_data: MessageCreate,
+    sender_id: str = Query(..., description="送信者のユーザーID"),
+    db: AsyncSession = Depends(get_db)
 ):
     """新しいメッセージを作成"""
     # 送信者の存在確認

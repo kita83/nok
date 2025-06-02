@@ -159,6 +159,13 @@ impl App {
                 if self.current_room >= self.rooms.len() {
                     self.current_room = 0;
                 }
+                // 選択されたルームインデックスも調整
+                if self.selected_room_idx >= self.rooms.len() && !self.rooms.is_empty() {
+                    self.selected_room_idx = 0;
+                }
+
+                // 各ルームのメンバー情報を取得してユーザーに関連付け
+                self.update_user_room_associations().await;
             }
             Err(e) => {
                 self.set_error(format!("Failed to load rooms: {}", e));
@@ -355,7 +362,7 @@ impl App {
         }
     }
 
-    fn cycle_focus(&mut self, backward: bool) {
+    pub fn cycle_focus(&mut self, backward: bool) {
         let panes = [
             PaneIdentifier::Rooms,
             PaneIdentifier::Users,
@@ -371,7 +378,7 @@ impl App {
         self.focused_pane = panes[next_idx];
     }
 
-    fn handle_down_key(&mut self) {
+    pub fn handle_down_key(&mut self) {
         match self.focused_pane {
             PaneIdentifier::Rooms => {
                 if !self.rooms.is_empty() {
@@ -394,7 +401,7 @@ impl App {
         }
     }
 
-    fn handle_up_key(&mut self) {
+    pub fn handle_up_key(&mut self) {
         match self.focused_pane {
             PaneIdentifier::Rooms => {
                 if !self.rooms.is_empty() {
@@ -429,7 +436,7 @@ impl App {
         }
     }
 
-    fn handle_confirm_key(&mut self) {
+    pub fn handle_confirm_key(&mut self) {
         match self.focused_pane {
             PaneIdentifier::Rooms => {
                 // ルームを変更して、そのルームに参加
@@ -473,6 +480,34 @@ impl App {
         if !self.users.is_empty() {
             let current = self.selected_user.unwrap_or(0);
             self.selected_user = Some((current + 1) % self.users.len());
+        }
+    }
+
+    // ユーザーと部屋の関連付けを更新
+    async fn update_user_room_associations(&mut self) {
+        // まずすべてのユーザーの部屋リストをクリア
+        for user in &mut self.users {
+            user.rooms.clear();
+        }
+
+        // 各ルームのメンバーを取得してユーザーに関連付け
+        for room in &self.rooms {
+            if let Some(room_id) = &room.id {
+                match self.api_client.get_room_members(room_id).await {
+                    Ok(members) => {
+                        for member in members {
+                            // 該当するユーザーを見つけて部屋IDを追加
+                            if let Some(user) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(&member.id)) {
+                                user.rooms.push(room_id.clone());
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        // エラーは記録するが処理は継続
+                        eprintln!("Failed to get members for room {}: {}", room_id, e);
+                    }
+                }
+            }
         }
     }
 
