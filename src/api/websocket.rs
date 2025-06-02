@@ -151,4 +151,10 @@ impl WebSocketClient {
         };
         self.send_message(message)
     }
+
+    pub async fn disconnect(&mut self) {
+        // チャンネルをクローズして接続を切断
+        self.sender = None;
+        self.receiver = None;
+    }
 }

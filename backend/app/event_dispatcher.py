@@ -92,30 +92,33 @@ class EventDispatcher:
 
     async def dispatch_user_status_change(self, user_id: str, status: str):
         """ユーザーステータス変更イベントを配信"""
-        async with AsyncSessionLocal() as session:
-            # ユーザーのステータスを更新
-            user = await session.get(User, user_id)
-            if not user:
-                logger.error(f"User {user_id} not found")
-                return
+        try:
+            async with AsyncSessionLocal() as session:
+                # ユーザーのステータスを更新
+                user = await session.get(User, user_id)
+                if not user:
+                    logger.error(f"User {user_id} not found")
+                    return
 
-            user.status = status
-            user.updated_at = datetime.utcnow()
-            await session.commit()
+                user.status = status
+                user.updated_at = datetime.utcnow()
+                await session.commit()
 
-            # 全ユーザーにステータス変更を通知
-            message = {
-                "type": "user_status",
-                "user_id": user_id,
-                "user_name": user.name,
-                "status": status,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
+                # 全ユーザーにステータス変更を通知
+                message = {
+                    "type": "user_status",
+                    "user_id": user_id,
+                    "user_name": user.name,
+                    "status": status,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
 
-            await self.websocket_manager.broadcast_message(
-                message, exclude_user=user_id
-            )
-            logger.info(f"User {user_id} status changed to {status}")
+                await self.websocket_manager.broadcast_message(
+                    message, exclude_user=user_id
+                )
+                logger.info(f"User {user_id} status changed to {status}")
+        except Exception as e:
+            logger.error(f"Failed to dispatch user status change for {user_id}: {e}")
 
     async def dispatch_room_join(self, user_id: str, room_id: str):
         """ルーム参加イベントを配信"""

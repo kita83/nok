@@ -13,9 +13,133 @@ pub enum TabView {
     Rooms,
     Users,
     Chat,
+    Settings,
 }
 
 pub fn ui(f: &mut Frame, app: &mut App) {
+    match app.state {
+        AppState::Settings => {
+            render_settings(f, app);
+            return;
+        }
+        _ => {}
+    }
+    render_main_ui(f, app);
+}
+
+fn render_settings(f: &mut Frame, app: &mut App) {
+    let size = f.size();
+
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),      // タイトル
+            Constraint::Length(8),      // ユーザー名設定
+            Constraint::Length(3),      // 保存ボタン
+            Constraint::Length(8),      // ログ表示エリア
+            Constraint::Min(5),         // ヘルプ
+        ].as_ref())
+        .split(size);
+
+    // タイトル
+    let title_block = Block::default()
+        .title("Settings")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+    f.render_widget(title_block, main_chunks[0]);
+
+    // ユーザー名設定
+    let username_block = Block::default()
+        .title("Username")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let username_area = username_block.inner(main_chunks[1]);
+    f.render_widget(username_block, main_chunks[1]);
+
+    let username_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2),      // 現在のユーザー名
+            Constraint::Length(1),      // 空行
+            Constraint::Length(2),      // 編集中のユーザー名
+        ].as_ref())
+        .split(username_area);
+
+    // 現在のユーザー名
+    let current_username_text = format!("Current username: {}", app.config.username);
+    let current_username_paragraph = Paragraph::new(current_username_text)
+        .style(Style::default().fg(Color::White));
+    f.render_widget(current_username_paragraph, username_chunks[0]);
+
+    // 編集中のユーザー名
+    let edit_username_text = format!("New username: {}_", app.username_edit_buffer);
+    let edit_username_paragraph = Paragraph::new(edit_username_text)
+        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+    f.render_widget(edit_username_paragraph, username_chunks[2]);
+
+    // 保存ボタン
+    let save_block = Block::default()
+        .title("Actions")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let save_area = save_block.inner(main_chunks[2]);
+    f.render_widget(save_block, main_chunks[2]);
+
+    let save_text = "Press Enter to save, Esc to cancel";
+    let save_paragraph = Paragraph::new(save_text)
+        .style(Style::default().fg(Color::Green));
+    f.render_widget(save_paragraph, save_area);
+
+    // ログ表示エリア
+    let log_block = Block::default()
+        .title("Settings Log")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let log_area = log_block.inner(main_chunks[3]);
+    f.render_widget(log_block, main_chunks[3]);
+
+    // 最新のログから表示（最大5行）
+    let visible_logs: Vec<&String> = app.settings_logs.iter()
+        .rev()
+        .take(5)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    let log_text = if visible_logs.is_empty() {
+        "No settings logs yet...".to_string()
+    } else {
+        visible_logs.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join("\n")
+    };
+
+    let log_paragraph = Paragraph::new(log_text)
+        .style(Style::default().fg(Color::Gray))
+        .wrap(Wrap { trim: true });
+    f.render_widget(log_paragraph, log_area);
+
+    // ヘルプ
+    let help_block = Block::default()
+        .title("Help")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let help_area = help_block.inner(main_chunks[4]);
+    f.render_widget(help_block, main_chunks[4]);
+
+    let help_text = "Settings Help:\n\n\
+                     • Type to edit your username\n\
+                     • Press Enter to save changes\n\
+                     • Press Esc to cancel and return\n\
+                     • Press Backspace to delete characters\n\n\
+                     Note: Username changes take effect after reconnecting.\n\
+                     Press F5 after returning to reconnect to the server.";
+    let help_paragraph = Paragraph::new(help_text)
+        .style(Style::default().fg(Color::Gray))
+        .wrap(Wrap { trim: true });
+    f.render_widget(help_paragraph, help_area);
+}
+
+fn render_main_ui(f: &mut Frame, app: &mut App) {
     let size = f.size();
 
     // ターミナルサイズチェック
@@ -27,11 +151,23 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         return;
     }
 
-    // Main layout: two horizontal panes (left and right)
+    // Main layout: top area and debug log area at bottom
+    let main_vertical_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(10),    // Main content area
+            Constraint::Length(6),  // Debug log area at bottom
+        ].as_ref())
+        .split(size);
+
+    let main_content_area = main_vertical_chunks[0];
+    let debug_log_area = main_vertical_chunks[1];
+
+    // Main content layout: two horizontal panes (left and right)
     let main_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)].as_ref())
-        .split(size);
+        .split(main_content_area);
 
     let left_pane_area = main_chunks[0];
     let right_pane_area = main_chunks[1];
@@ -246,6 +382,8 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     status_text.push_str("\n↑↓: Navigate");
     status_text.push_str("\nEnter: Select");
     status_text.push_str("\nn: Knock (Users)");
+    status_text.push_str("\ns: Settings");
+    status_text.push_str("\nF5: Reconnect");
     status_text.push_str("\nq: Quit");
 
     // Show notifications if any
@@ -262,4 +400,33 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         .style(Style::default().fg(Color::Green))
         .wrap(Wrap { trim: true });
     f.render_widget(status_paragraph, content_area);
+
+    // --- Render Debug Log Section ---
+    let debug_block = Block::default()
+        .title("Debug Logs")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray));
+
+    let debug_content_area = debug_block.inner(debug_log_area);
+    f.render_widget(debug_block, debug_log_area);
+
+    // 最新のログから表示（最大4行）
+    let visible_logs: Vec<&String> = app.debug_logs.iter()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    let debug_text = if visible_logs.is_empty() {
+        "No debug logs yet...".to_string()
+    } else {
+        visible_logs.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join("\n")
+    };
+
+    let debug_paragraph = Paragraph::new(debug_text)
+        .style(Style::default().fg(Color::DarkGray))
+        .wrap(Wrap { trim: true });
+    f.render_widget(debug_paragraph, debug_content_area);
 }

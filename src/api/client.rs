@@ -75,6 +75,32 @@ impl ApiClient {
         Ok(users.into_iter().find(|u| u.name == name))
     }
 
+    pub async fn find_user_by_id(&self, user_id: &str) -> Result<Option<ApiUser>, Box<dyn Error>> {
+        let url = format!("{}/api/users/{}", self.base_url, user_id);
+        let response = self.client.get(&url).send().await?;
+
+        if response.status() == 404 {
+            return Ok(None);
+        }
+
+        let user: ApiUser = response.json().await?;
+        Ok(Some(user))
+    }
+
+    pub async fn update_user(&self, user_id: &str, name: &str, status: Option<&str>) -> Result<ApiUser, Box<dyn Error>> {
+        let url = format!("{}/api/users/{}", self.base_url, user_id);
+        let mut update_data = serde_json::Map::new();
+        update_data.insert("name".to_string(), serde_json::Value::String(name.to_string()));
+
+        if let Some(status) = status {
+            update_data.insert("status".to_string(), serde_json::Value::String(status.to_string()));
+        }
+
+        let response = self.client.put(&url).json(&update_data).send().await?;
+        let user: ApiUser = response.json().await?;
+        Ok(user)
+    }
+
     pub async fn get_rooms(&self) -> Result<Vec<ApiRoom>, Box<dyn Error>> {
         let url = format!("{}/api/rooms/", self.base_url);
         let response = self.client.get(&url).send().await?;

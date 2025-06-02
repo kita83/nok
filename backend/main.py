@@ -76,11 +76,20 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 
     except WebSocketDisconnect:
         await websocket_manager.disconnect(user_id)
-        await event_dispatcher.dispatch_user_status_change(user_id, "offline")
+        # オフライン状態への変更を安全に実行
+        try:
+            await event_dispatcher.dispatch_user_status_change(user_id, "offline")
+        except Exception as status_error:
+            logger.error(f"Failed to update user status for {user_id}: {status_error}")
         logger.info(f"User {user_id} disconnected")
     except Exception as e:
         logger.error(f"WebSocket error for user {user_id}: {e}")
         await websocket_manager.disconnect(user_id)
+        # エラー時もオフライン状態への変更を試行
+        try:
+            await event_dispatcher.dispatch_user_status_change(user_id, "offline")
+        except Exception as status_error:
+            logger.error(f"Failed to update user status for {user_id} after error: {status_error}")
 
 
 async def handle_websocket_message(user_id: str, message_data: dict):

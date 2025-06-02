@@ -2,6 +2,7 @@ mod state;
 pub mod user;
 mod room;
 mod message;
+mod config;
 
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyCode;
@@ -9,9 +10,11 @@ pub use state::AppState;
 pub use user::{User, UserStatus};
 pub use room::Room;
 pub use message::Message;
+pub use config::Config;
 use crate::ui::TabView;
 use crate::api::{ApiClient, WebSocketClient};
-use tokio::sync::mpsc;
+use chrono;
+
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PaneIdentifier {
@@ -44,6 +47,15 @@ pub struct App {
     pub api_client: ApiClient,
     pub websocket_client: WebSocketClient,
     pub connection_status: ConnectionStatus,
+    // デバッグログ用
+    pub debug_logs: Vec<String>,
+    pub max_debug_logs: usize,
+    // 設定機能
+    pub config: Config,
+    pub username_edit_buffer: String,
+    // 設定画面用のログ
+    pub settings_logs: Vec<String>,
+    pub should_reconnect: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -56,10 +68,15 @@ pub enum ConnectionStatus {
 
 impl App {
     pub fn new() -> Self {
-        // Create a default user
-        let current_user = User::new("You".to_string());
+        // 設定を読み込み
+        let config = Config::load();
 
-        Self {
+        // 設定からユーザー情報を作成
+        let mut current_user = User::new(config.username.clone());
+        // 永続化されたuser_idを使用
+        current_user.id = Some(config.user_id.clone());
+
+        let mut app = Self {
             state: AppState::Normal,
             users: Vec::new(),
             rooms: Vec::new(),
@@ -78,7 +95,18 @@ impl App {
             api_client: ApiClient::new(),
             websocket_client: WebSocketClient::new(),
             connection_status: ConnectionStatus::Disconnected,
-        }
+            debug_logs: Vec::new(),
+            max_debug_logs: 50,
+            username_edit_buffer: config.username.clone(),
+            config: config.clone(),
+            settings_logs: Vec::new(),
+            should_reconnect: false,
+        };
+
+        // 設定ファイル読み込み状況をデバッグログに追加
+        app.add_debug_log(format!("Config loaded - user_id: {}, username: {}", config.user_id, config.username));
+
+        app
     }
 
     // バックエンドとの接続を初期化
@@ -92,33 +120,40 @@ impl App {
         }
 
         // ユーザーを作成または取得
-        if self.current_user.id.is_none() {
-            // まず既存ユーザーを検索
-            match self.api_client.find_user_by_name(&self.current_user.name).await {
-                Ok(Some(existing_user)) => {
-                    // 既存ユーザーが見つかった場合はそれを使用
-                    self.current_user.id = Some(existing_user.id.clone());
-                    self.current_user.status = match existing_user.status.as_str() {
-                        "online" => UserStatus::Online,
-                        "away" => UserStatus::Away,
-                        "busy" => UserStatus::Busy,
-                        _ => UserStatus::Offline,
-                    };
+        // 設定されたuser_idを優先的に使用し、なければユーザー名で検索
+        let mut found_existing_user = false;
+
+        // まず設定のuser_idで既存ユーザーを検索
+        if let Ok(Some(existing_user)) = self.api_client.find_user_by_id(&self.config.user_id).await {
+            // 既存ユーザーが見つかった場合、ユーザー名が変更されていれば更新
+            if existing_user.name != self.current_user.name {
+                if let Ok(updated_user) = self.api_client.update_user(&self.config.user_id, &self.current_user.name, None).await {
+                    self.current_user.id = Some(updated_user.id.clone());
+                    found_existing_user = true;
                 }
-                Ok(None) => {
-                    // 既存ユーザーがいない場合は新規作成
-                    match self.api_client.create_user(&self.current_user.name).await {
-                        Ok(api_user) => {
-                            self.current_user.id = Some(api_user.id.clone());
-                        }
-                        Err(e) => {
-                            self.connection_status = ConnectionStatus::Error(format!("Failed to create user: {}", e));
-                            return Err(e);
-                        }
-                    }
+            } else {
+                self.current_user.id = Some(existing_user.id.clone());
+                self.current_user.status = match existing_user.status.as_str() {
+                    "online" => UserStatus::Online,
+                    "away" => UserStatus::Away,
+                    "busy" => UserStatus::Busy,
+                    _ => UserStatus::Offline,
+                };
+                found_existing_user = true;
+            }
+        }
+
+        // 既存ユーザーが見つからない場合は新規作成
+        if !found_existing_user {
+            match self.api_client.create_user(&self.current_user.name).await {
+                Ok(api_user) => {
+                    self.current_user.id = Some(api_user.id.clone());
+                    // 新しいuser_idを設定に保存
+                    self.config.user_id = api_user.id.clone();
+                    self.config.save();
                 }
                 Err(e) => {
-                    self.connection_status = ConnectionStatus::Error(format!("Failed to find user: {}", e));
+                    self.connection_status = ConnectionStatus::Error(format!("Failed to create user: {}", e));
                     return Err(e);
                 }
             }
@@ -137,6 +172,30 @@ impl App {
 
         self.connection_status = ConnectionStatus::Connected;
         Ok(())
+    }
+
+    // 再接続機能
+    pub async fn reconnect(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.add_debug_log("Starting reconnection process".to_string());
+        self.add_settings_log("Disconnecting from current session...".to_string());
+
+        // 既存の接続を切断
+        self.websocket_client.disconnect().await;
+        self.connection_status = ConnectionStatus::Disconnected;
+
+        self.add_settings_log("Reconnecting with new username...".to_string());
+
+        // 新しいユーザー名で再接続
+        match self.initialize_connection().await {
+            Ok(_) => {
+                self.add_settings_log("Reconnection completed successfully".to_string());
+                Ok(())
+            }
+            Err(e) => {
+                self.add_settings_log(format!("Reconnection failed: {}", e));
+                Err(e)
+            }
+        }
     }
 
     // バックエンドからデータを更新
@@ -192,6 +251,7 @@ impl App {
     // WebSocketメッセージを処理
     pub async fn handle_websocket_message(&mut self) {
         if let Some(ws_message) = self.websocket_client.receive_message().await {
+            self.add_debug_log(format!("Received WebSocket message: type={}", ws_message.r#type));
             match ws_message.r#type.as_str() {
                 "knock" => {
                     if let Some(sender_name) = ws_message.user_id {
@@ -278,6 +338,18 @@ impl App {
                     KeyCode::Char('2') => self.focused_pane = PaneIdentifier::Users,
                     KeyCode::Char('3') => self.focused_pane = PaneIdentifier::Messages,
                     KeyCode::Char('4') => self.focused_pane = PaneIdentifier::AsciiArt,
+                    KeyCode::Char('s') => {
+                        // 設定画面への遷移
+                        self.add_settings_log("Entering settings screen".to_string());
+                        self.state = AppState::Settings;
+                        self.username_edit_buffer = self.config.username.clone();
+                        self.add_settings_log(format!("Current username: '{}'", self.config.username));
+                    },
+                    KeyCode::F(5) => {
+                        // 再接続機能
+                        self.notification = Some("Reconnecting...".to_string());
+                        // 非同期処理なので実際の処理は別途必要
+                    },
                     KeyCode::Tab => {
                         self.cycle_focus(false);
                     },
@@ -310,6 +382,56 @@ impl App {
                                 }
                             }
                         }
+                    },
+                    _ => {}
+                }
+            },
+            AppState::Settings => {
+                match key.code {
+                    KeyCode::Enter => {
+                        // ユーザー名を保存
+                        if !self.username_edit_buffer.trim().is_empty() {
+                            self.add_settings_log(format!("Attempting to save username: '{}'", self.username_edit_buffer.trim()));
+                            let old_username = self.config.username.clone();
+                            let new_username = self.username_edit_buffer.trim().to_string();
+
+                            // ユーザー名が変更された場合のみリコネクト
+                            let username_changed = old_username != new_username;
+
+                            self.config.update_username(new_username);
+                            self.current_user.name = self.config.username.clone();
+                            self.add_settings_log(format!("Username changed from '{}' to '{}'", old_username, self.config.username));
+
+                            if username_changed {
+                                self.add_settings_log("Username changed, initiating automatic reconnection...".to_string());
+                                self.notification = Some("Username updated! Reconnecting...".to_string());
+                                // リコネクトフラグを設定（非同期処理のため、後で処理）
+                                self.should_reconnect = true;
+                            } else {
+                                self.notification = Some("Username updated!".to_string());
+                            }
+                        } else {
+                            self.add_settings_log("Username cannot be empty".to_string());
+                        }
+                        self.state = AppState::Normal;
+                    },
+                    KeyCode::Esc => {
+                        // キャンセル
+                        self.add_settings_log("Settings cancelled".to_string());
+                        self.username_edit_buffer = self.config.username.clone();
+                        self.state = AppState::Normal;
+                    },
+                    KeyCode::Char(c) => {
+                        // 文字入力
+                        if self.username_edit_buffer.len() < 20 { // 最大長制限
+                            self.username_edit_buffer.push(c);
+                            self.add_settings_log(format!("Editing username: '{}'", self.username_edit_buffer));
+                        }
+                    },
+                    KeyCode::Backspace => {
+                        // 文字削除
+                        self.username_edit_buffer.pop();
+                        self.add_settings_log(format!("Editing username: '{}'", self.username_edit_buffer));
                     },
                     _ => {}
                 }
@@ -474,6 +596,22 @@ impl App {
 
     pub fn set_error(&mut self, error: String) {
         self.error = Some(error);
+    }
+
+    pub fn add_debug_log(&mut self, log: String) {
+        let timestamp = chrono::Local::now().format("%H:%M:%S").to_string();
+        self.debug_logs.push(format!("[{}] {}", timestamp, log));
+        if self.debug_logs.len() > self.max_debug_logs {
+            self.debug_logs.remove(0);
+        }
+    }
+
+    pub fn add_settings_log(&mut self, log: String) {
+        let timestamp = chrono::Local::now().format("%H:%M:%S").to_string();
+        self.settings_logs.push(format!("[{}] {}", timestamp, log));
+        if self.settings_logs.len() > 10 { // 設定ログは最大10件
+            self.settings_logs.remove(0);
+        }
     }
 
     pub fn select_next_user(&mut self) {
