@@ -378,6 +378,9 @@ impl App {
                                         self.set_error(format!("Failed to send knock: {}", e));
                                     } else {
                                         self.notification = Some(format!("Knocked on {}", user.name));
+                                        if let Err(e) = crate::audio::play_knock_sound() {
+                                            self.add_debug_log(format!("Error playing knock sound on send: {}", e));
+                                        }
                                     }
                                 }
                             }
@@ -585,8 +588,8 @@ impl App {
     pub fn knock(&mut self, target_user: &str) {
         self.notification = Some(format!("Knocked on {}", target_user));
         // Play knock sound
-        if let Err(_) = crate::audio::play_knock_sound() {
-            // Silently handle audio errors
+        if let Err(e) = crate::audio::play_knock_sound() {
+            self.add_debug_log(format!("Error playing knock sound: {}", e));
         }
     }
 
