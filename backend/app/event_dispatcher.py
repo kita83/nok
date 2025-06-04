@@ -93,8 +93,11 @@ class EventDispatcher:
     async def dispatch_user_status_change(self, user_id: str, status: str):
         """ユーザーステータス変更イベントを配信"""
         try:
+            # まずWebSocketManagerでリアルタイムステータスを更新
+            self.websocket_manager.update_user_status(user_id, status)
+
             async with AsyncSessionLocal() as session:
-                # ユーザーのステータスを更新
+                # ユーザーのステータスを更新（DBは同期用）
                 user = await session.get(User, user_id)
                 if not user:
                     logger.error(f"User {user_id} not found")

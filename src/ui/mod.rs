@@ -35,9 +35,10 @@ fn render_settings(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(3),      // タイトル
             Constraint::Length(8),      // ユーザー名設定
+            Constraint::Length(6),      // ステータス設定
             Constraint::Length(3),      // 保存ボタン
             Constraint::Length(8),      // ログ表示エリア
-            Constraint::Min(5),         // ヘルプ
+            Constraint::Min(3),         // ヘルプ
         ].as_ref())
         .split(size);
 
@@ -77,13 +78,50 @@ fn render_settings(f: &mut Frame, app: &mut App) {
         .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
     f.render_widget(edit_username_paragraph, username_chunks[2]);
 
+    // ステータス設定
+    let status_block = Block::default()
+        .title("Status")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::White));
+    let status_area = status_block.inner(main_chunks[2]);
+    f.render_widget(status_block, main_chunks[2]);
+
+    let status_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),      // 現在のステータス
+            Constraint::Length(1),      // 空行
+            Constraint::Length(2),      // ステータス選択
+        ].as_ref())
+        .split(status_area);
+
+    // 現在のステータス
+    let current_status_char = match app.current_user.status {
+        crate::app::user::UserStatus::Online => "●",
+        crate::app::user::UserStatus::Away => "○",
+        crate::app::user::UserStatus::Busy => "◆",
+        crate::app::user::UserStatus::Offline => "◇",
+    };
+    let current_status_text = format!("Current status: {} {:?}", current_status_char, app.current_user.status);
+    let current_status_paragraph = Paragraph::new(current_status_text)
+        .style(Style::default().fg(Color::White));
+    f.render_widget(current_status_paragraph, status_chunks[0]);
+
+    // ステータス選択
+    let status_options = ["Online ●", "Away ○", "Busy ◆"];
+    let selected_option = &status_options[app.status_selection_index];
+    let status_selection_text = format!("Select: {} (Tab to cycle, Space to apply)", selected_option);
+    let status_selection_paragraph = Paragraph::new(status_selection_text)
+        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+    f.render_widget(status_selection_paragraph, status_chunks[2]);
+
     // 保存ボタン
     let save_block = Block::default()
         .title("Actions")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White));
-    let save_area = save_block.inner(main_chunks[2]);
-    f.render_widget(save_block, main_chunks[2]);
+    let save_area = save_block.inner(main_chunks[3]);
+    f.render_widget(save_block, main_chunks[3]);
 
     let save_text = "Press Enter to save, Esc to cancel";
     let save_paragraph = Paragraph::new(save_text)
@@ -95,8 +133,8 @@ fn render_settings(f: &mut Frame, app: &mut App) {
         .title("Settings Log")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow));
-    let log_area = log_block.inner(main_chunks[3]);
-    f.render_widget(log_block, main_chunks[3]);
+    let log_area = log_block.inner(main_chunks[4]);
+    f.render_widget(log_block, main_chunks[4]);
 
     // 最新のログから表示（最大5行）
     let visible_logs: Vec<&String> = app.settings_logs.iter()
@@ -123,16 +161,19 @@ fn render_settings(f: &mut Frame, app: &mut App) {
         .title("Help")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White));
-    let help_area = help_block.inner(main_chunks[4]);
-    f.render_widget(help_block, main_chunks[4]);
+    let help_area = help_block.inner(main_chunks[5]);
+    f.render_widget(help_block, main_chunks[5]);
 
     let help_text = "Settings Help:\n\n\
+                     Username:\n\
                      • Type to edit your username\n\
                      • Press Enter to save changes\n\
-                     • Press Esc to cancel and return\n\
                      • Press Backspace to delete characters\n\n\
-                     Note: Username changes take effect after reconnecting.\n\
-                     Press F5 after returning to reconnect to the server.";
+                     Status:\n\
+                     • Press Tab to cycle through status options\n\
+                     • Press Space to apply selected status\n\n\
+                     • Press Esc to cancel and return\n\
+                     Note: Username changes take effect after reconnecting.";
     let help_paragraph = Paragraph::new(help_text)
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: true });
@@ -376,6 +417,15 @@ fn render_main_ui(f: &mut Frame, app: &mut App) {
         status_text.push_str(&format!("\n\nCurrent Room: {}", app.rooms[app.current_room].name));
     }
 
+    // Add current user status
+    let status_char = match app.current_user.status {
+        crate::app::user::UserStatus::Online => "●",
+        crate::app::user::UserStatus::Away => "○",
+        crate::app::user::UserStatus::Busy => "◆",
+        crate::app::user::UserStatus::Offline => "◇",
+    };
+    status_text.push_str(&format!("\nYour Status: {} {:?}", status_char, app.current_user.status));
+
     // Add controls
     status_text.push_str("\n\nControls:");
     status_text.push_str("\nTab: Switch focus");
@@ -385,6 +435,7 @@ fn render_main_ui(f: &mut Frame, app: &mut App) {
     status_text.push_str("\ns: Settings");
     status_text.push_str("\nF5: Reconnect");
     status_text.push_str("\nq: Quit");
+
 
     // Show notifications if any
     if let Some(ref notification) = app.notification {

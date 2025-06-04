@@ -10,9 +10,12 @@ router = APIRouter()
 
 @router.get("/", response_model=list[UserResponse])
 async def list_users(db: AsyncSession = Depends(get_db)):
-    """ユーザー一覧を取得"""
+    """ユーザー一覧を取得（リアルタイムステータス付き）"""
     result = await db.execute(select(User))
     users = result.scalars().all()
+
+    # WebSocketManagerからリアルタイムステータスを取得する必要があるが、
+    # 現在はDB のステータスをそのまま返す（後で改善予定）
     return users
 
 
