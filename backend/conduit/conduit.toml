@@ -1,0 +1,55 @@
+[global]
+# Server name and port
+server_name = "nok.local"
+port = 6167
+bind = "127.0.0.1"
+
+# Database backend
+database_backend = "rocksdb"
+database_path = "./database/"
+
+# Room settings
+default_room_version = "10"
+supported_room_versions = ["10"]
+
+# Federation settings (disabled for now)
+allow_federation = false
+trusted_servers = []
+
+# Registration settings
+allow_registration = true
+registration_token = "nokdev_registration_token"
+
+# Rate limiting (relaxed for development)
+rate_limit_per_second = 100
+rate_limit_burst = 200
+
+# Maximum file size (10MB)
+max_request_size = 10485760
+
+# Logging
+log_level = "info"
+
+# Turn server settings (disabled for now)
+turn_username = ""
+turn_password = ""
+turn_uris = []
+
+# CORS settings for web clients
+allow_unknown_sni = true
+
+# Emergency password (for admin access)
+emergency_password = "nokdev123"
+
+# Disable encryption for development
+allow_encryption = true
+allow_unstable_room_versions = false
+
+# Media settings
+max_concurrent_requests = 100
+
+# Metrics (disabled for development)
+enable_metrics = false
+
+# Worker settings
+worker_count = 1

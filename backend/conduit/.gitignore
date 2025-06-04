@@ -1,0 +1,12 @@
+# Conduit database files
+database/
+
+# Conduit source code (external dependency)
+conduit-src/
+
+# Conduit configuration (if it contains sensitive info)
+# conduit.toml
+
+# Log files
+*.log
+*.log.*
