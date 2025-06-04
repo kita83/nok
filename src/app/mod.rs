@@ -63,6 +63,17 @@ pub struct App {
     pub matrix_client: Option<MatrixClient>,
     pub matrix_config: MatrixConfig,
     pub matrix_mode: bool, // Matrix mode有効フラグ
+    // Login fields
+    pub login_username: String,
+    pub login_password: String,
+    pub login_error: Option<String>,
+    pub login_field_focus: LoginField, // username or password
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum LoginField {
+    Username,
+    Password,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -112,6 +123,10 @@ impl App {
             matrix_client: None,
             matrix_config: MatrixConfig::default(),
             matrix_mode: false,
+            login_username: String::new(),
+            login_password: String::new(),
+            login_error: None,
+            login_field_focus: LoginField::Username,
         };
 
         // 設定ファイル読み込み状況をデバッグログに追加
@@ -413,6 +428,57 @@ impl App {
 
     pub fn handle_key(&mut self, key: KeyEvent) {
         match self.state {
+            AppState::Login => {
+                match key.code {
+                    KeyCode::Tab => {
+                        // Switch between username and password fields
+                        self.login_field_focus = match self.login_field_focus {
+                            LoginField::Username => LoginField::Password,
+                            LoginField::Password => LoginField::Username,
+                        };
+                    },
+                    KeyCode::Enter => {
+                        // Attempt login
+                        if !self.login_username.trim().is_empty() && !self.login_password.trim().is_empty() {
+                            // Clear any previous error
+                            self.login_error = None;
+                            // Login will be handled asynchronously in the main loop
+                            self.notification = Some("Attempting login...".to_string());
+                        } else {
+                            self.login_error = Some("Username and password are required".to_string());
+                        }
+                    },
+                    KeyCode::Esc => {
+                        // Exit application
+                        std::process::exit(0);
+                    },
+                    KeyCode::Char(c) => {
+                        match self.login_field_focus {
+                            LoginField::Username => {
+                                if self.login_username.len() < 30 {
+                                    self.login_username.push(c);
+                                }
+                            },
+                            LoginField::Password => {
+                                if self.login_password.len() < 30 {
+                                    self.login_password.push(c);
+                                }
+                            },
+                        }
+                    },
+                    KeyCode::Backspace => {
+                        match self.login_field_focus {
+                            LoginField::Username => {
+                                self.login_username.pop();
+                            },
+                            LoginField::Password => {
+                                self.login_password.pop();
+                            },
+                        }
+                    },
+                    _ => {}
+                }
+            },
             AppState::Normal => {
                 // First, check for pane-specific keybindings if a certain pane is focused
                 if self.focused_pane == PaneIdentifier::AsciiArt {

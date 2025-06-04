@@ -13,7 +13,7 @@ use ratatui::{
 };
 use tokio::time;
 
-use crate::app::{App, AppState, PaneIdentifier};
+use crate::app::{App, AppState, PaneIdentifier, LoginField};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum TabView {
@@ -25,6 +25,10 @@ pub enum TabView {
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     match app.state {
+        AppState::Login => {
+            render_login(f, app);
+            return;
+        }
         AppState::Settings => {
             render_settings(f, app);
             return;
@@ -32,6 +36,123 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         _ => {}
     }
     render_main_ui(f, app);
+}
+
+fn render_login(f: &mut Frame, app: &mut App) {
+    let size = f.size();
+
+    // Main layout
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(7),      // Title
+            Constraint::Length(6),      // Username field
+            Constraint::Length(6),      // Password field
+            Constraint::Length(4),      // Login button
+            Constraint::Length(3),      // Error message
+            Constraint::Min(3),         // Help
+        ].as_ref())
+        .split(size);
+
+    // Title
+    let title_block = Block::default()
+        .title("nok Matrix Login")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+    let title_area = title_block.inner(main_chunks[0]);
+    f.render_widget(title_block, main_chunks[0]);
+
+    let title_text = "Welcome to nok Matrix Edition!\n\nPlease enter your Matrix credentials:";
+    let title_paragraph = Paragraph::new(title_text)
+        .style(Style::default().fg(Color::White))
+        .wrap(Wrap { trim: true });
+    f.render_widget(title_paragraph, title_area);
+
+    // Username field
+    let username_border_style = if app.login_field_focus == LoginField::Username {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    let username_block = Block::default()
+        .title("Username")
+        .borders(Borders::ALL)
+        .border_style(username_border_style);
+    let username_area = username_block.inner(main_chunks[1]);
+    f.render_widget(username_block, main_chunks[1]);
+
+    let username_text = if app.login_field_focus == LoginField::Username {
+        format!("{}_", app.login_username)
+    } else {
+        app.login_username.clone()
+    };
+    let username_paragraph = Paragraph::new(username_text)
+        .style(Style::default().fg(Color::White));
+    f.render_widget(username_paragraph, username_area);
+
+    // Password field
+    let password_border_style = if app.login_field_focus == LoginField::Password {
+        Style::default().fg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    let password_block = Block::default()
+        .title("Password")
+        .borders(Borders::ALL)
+        .border_style(password_border_style);
+    let password_area = password_block.inner(main_chunks[2]);
+    f.render_widget(password_block, main_chunks[2]);
+
+    let password_text = if app.login_field_focus == LoginField::Password {
+        format!("{}_", "*".repeat(app.login_password.len()))
+    } else {
+        "*".repeat(app.login_password.len())
+    };
+    let password_paragraph = Paragraph::new(password_text)
+        .style(Style::default().fg(Color::White));
+    f.render_widget(password_paragraph, password_area);
+
+    // Login button
+    let login_block = Block::default()
+        .title("Login")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Green));
+    let login_area = login_block.inner(main_chunks[3]);
+    f.render_widget(login_block, main_chunks[3]);
+
+    let login_text = "Press Enter to login";
+    let login_paragraph = Paragraph::new(login_text)
+        .style(Style::default().fg(Color::Green));
+    f.render_widget(login_paragraph, login_area);
+
+    // Error message
+    if let Some(ref error) = app.login_error {
+        let error_block = Block::default()
+            .title("Error")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red));
+        let error_area = error_block.inner(main_chunks[4]);
+        f.render_widget(error_block, main_chunks[4]);
+
+        let error_paragraph = Paragraph::new(error.as_str())
+            .style(Style::default().fg(Color::Red))
+            .wrap(Wrap { trim: true });
+        f.render_widget(error_paragraph, error_area);
+    }
+
+    // Help
+    let help_block = Block::default()
+        .title("Help")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Gray));
+    let help_area = help_block.inner(main_chunks[5]);
+    f.render_widget(help_block, main_chunks[5]);
+
+    let help_text = "• Tab: Switch between fields\n• Enter: Login\n• Esc: Exit\n\nExample: demo_user / demo1234";
+    let help_paragraph = Paragraph::new(help_text)
+        .style(Style::default().fg(Color::Gray))
+        .wrap(Wrap { trim: true });
+    f.render_widget(help_paragraph, help_area);
 }
 
 fn render_settings(f: &mut Frame, app: &mut App) {
@@ -532,6 +653,40 @@ async fn run_app_loop<B: ratatui::backend::Backend>(
         if crossterm::event::poll(timeout)? {
             match event::read()? {
                 Event::Key(key) => {
+                    // Login screen has highest priority
+                    if app.state == AppState::Login {
+                        app.handle_key(key);
+
+                        // Check if login should be attempted
+                        if app.notification.as_ref().map_or(false, |n| n.contains("Attempting login")) {
+                            app.notification = Some("Logging in...".to_string());
+                            terminal.draw(|f| ui(f, &mut app))?;
+
+                            // Attempt login
+                            match app.matrix_login(&app.login_username.clone(), &app.login_password.clone()).await {
+                                Ok(_) => {
+                                    app.login_error = None;
+                                    app.notification = Some("Login successful!".to_string());
+
+                                    // Start Matrix sync
+                                    if let Err(e) = app.start_matrix_sync().await {
+                                        app.login_error = Some(format!("Failed to start sync: {}", e));
+                                    } else {
+                                        app.state = AppState::Normal;
+                                        app.notification = Some("Connected to Matrix!".to_string());
+                                    }
+                                }
+                                Err(e) => {
+                                    app.login_error = Some(format!("Login failed: {}", e));
+                                    app.notification = None;
+                                }
+                            }
+                        }
+
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        continue;
+                    }
+
                     // Settings screen has priority
                     if app.state == AppState::Settings {
                         app.add_settings_log(format!("Settings key pressed: {:?}", key.code));
@@ -541,7 +696,7 @@ async fn run_app_loop<B: ratatui::backend::Backend>(
                     }
 
                     match key.code {
-                        KeyCode::Char('q') => {
+                        KeyCode::Char('q') if app.state != AppState::Login => {
                             app.add_debug_log("Quit key pressed".to_string());
                             break;
                         },

@@ -1,0 +1,19 @@
+{
+  "user_mappings": {
+    "1781deb1-86fa-4eb1-8ee0-7864f6f34a7d": "@user1781deb186fa4eb1:nok.local",
+    "28daeb62-47da-48d3-a79a-c402578ed5a7": "@user28daeb6247da48d3:nok.local",
+    "1e0a80b8-5cb7-4377-a65c-7e52bf5de0f1": "@user1e0a80b85cb74377:nok.local",
+    "0e06fba5-6474-43a0-964a-4fb934b781db": "@user0e06fba5647443a0:nok.local",
+    "62f7cce8-c406-4e8f-bef3-90fa91121a6c": "@user62f7cce8c4064e8f:nok.local"
+  },
+  "room_mappings": {
+    "2376dac8-d71b-4631-8de5-4b0af6e4e1e1": "!B7E70CA913CB0BE4:nok.local",
+    "1c3e499e-f67c-4ba2-b2ef-074830ab2b61": "!93F911616C989FA8:nok.local",
+    "218b1adc-59a4-4b2b-8037-869432aa9eb0": "!A10AF14942ECE12C:nok.local"
+  },
+  "room_aliases": {
+    "1c3e499e-f67c-4ba2-b2ef-074830ab2b61": "room615f1c5c",
+    "218b1adc-59a4-4b2b-8037-869432aa9eb0": "roomb1adc75",
+    "2376dac8-d71b-4631-8de5-4b0af6e4e1e1": "room563c5989"
+  }
+}

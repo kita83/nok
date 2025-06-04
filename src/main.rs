@@ -59,8 +59,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Ok(config_migrator) = migration::config::ConfigMigrator::new() {
         if config_migrator.matrix_config_exists() {
             println!("📡 Matrix configuration detected - starting in Matrix mode");
-            // Initialize Matrix mode (when available)
+            // Initialize Matrix mode and set to login state
             app.toggle_matrix_mode();
+            app.state = app::AppState::Login;
             if let Err(e) = app.initialize_matrix().await {
                 eprintln!("❌ Failed to initialize Matrix mode: {}", e);
                 println!("💡 You may need to run migration first: nok --migrate");

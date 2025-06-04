@@ -59,14 +59,18 @@ pub struct ConfigMigrator {
 impl ConfigMigrator {
     /// Create a new configuration migrator
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let config_dir = dirs::config_dir()
-            .ok_or("Could not find config directory")?;
+        // Use different paths for legacy and Matrix configs based on platform
+        let legacy_config_dir = dirs::config_dir()
+            .ok_or("Could not find config directory")?
+            .join("nok");
 
-        let nok_config_dir = config_dir.join("nok");
+        let matrix_config_dir = dirs::data_dir()
+            .ok_or("Could not find data directory")?
+            .join("nok");
 
         Ok(Self {
-            legacy_config_path: nok_config_dir.join("config.json"),
-            new_config_path: nok_config_dir.join("matrix_config.json"),
+            legacy_config_path: legacy_config_dir.join("config.json"),
+            new_config_path: matrix_config_dir.join("matrix_config.json"),
         })
     }
 
