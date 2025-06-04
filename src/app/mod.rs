@@ -4,6 +4,14 @@ mod room;
 mod message;
 mod config;
 
+// New modular architecture
+pub mod core;
+pub mod matrix_state;
+pub mod legacy_state;
+pub mod state_manager;
+pub mod unified_config;
+pub mod app_new;
+
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyCode;
 pub use state::AppState;
@@ -11,9 +19,18 @@ pub use user::{User, UserStatus};
 pub use room::Room;
 pub use message::Message;
 pub use config::Config;
+
+// Re-export new modular components
+pub use core::{AppCore, UiState, DataState, LogState, NetworkState, PaneIdentifier, ConnectionStatus};
+pub use matrix_state::{MatrixState, LoginState, LoginField};
+pub use legacy_state::LegacyState;
+pub use state_manager::{StateManager, CommunicationMode};
+pub use unified_config::{UnifiedConfig, AppConfig, UserConfig, MatrixConfigExt, LegacyConfig, UiConfig, LoggingConfig, NetworkConfig};
+pub use app_new::App as NewApp;
 use crate::ui::TabView;
 use crate::api::{ApiClient, WebSocketClient};
 use crate::matrix::{MatrixClient, MatrixConfig};
+use crate::util::{ValidationError, LoginValidator, NokError, NokResult};
 use chrono;
 
 
@@ -229,7 +246,7 @@ impl App {
     }
 
     /// Initialize Matrix client
-    pub async fn initialize_matrix(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn initialize_matrix(&mut self) -> NokResult<()> {
         if self.matrix_mode {
             self.add_debug_log("Initializing Matrix client...".to_string());
 
@@ -244,30 +261,61 @@ impl App {
         }
     }
 
-    /// Login to Matrix homeserver
-    pub async fn matrix_login(&mut self, username: &str, password: &str) -> Result<(), Box<dyn std::error::Error>> {
+    /// Login to Matrix homeserver with input validation
+    pub async fn matrix_login(&mut self, username: &str, password: &str) -> NokResult<()> {
+        // Validate input credentials
+        let (validated_username, validated_password) = LoginValidator::validate_login_credentials(username, password)?;
+
         if let Some(ref client) = self.matrix_client {
-            client.login(username, password).await?;
+            client.login(&validated_username, &validated_password).await
+                .map_err(|e| NokError::MatrixLoginFailed(e.to_string()))?;
 
             // Update current user with Matrix ID
-            let matrix_id = format!("@{}:{}", username, self.matrix_config.server_name);
+            let matrix_id = if validated_username.starts_with('@') {
+                validated_username.clone()
+            } else {
+                format!("@{}:{}", validated_username, self.matrix_config.server_name)
+            };
             self.current_user.set_matrix_id(matrix_id);
 
-            self.add_debug_log(format!("Logged into Matrix as {}", username));
+            self.add_debug_log(format!("Logged into Matrix as {}", validated_username));
             Ok(())
         } else {
-            Err("Matrix client not initialized".into())
+            Err(NokError::MatrixClientNotInitialized)
         }
     }
 
+    /// Validate login input in real-time
+    pub fn validate_login_input(&self) -> Option<ValidationError> {
+        // Check username first
+        if let Err(e) = LoginValidator::validate_username(&self.login_username) {
+            return Some(e);
+        }
+        
+        // Only check password if username is valid and not empty
+        if !self.login_password.is_empty() {
+            if let Err(e) = LoginValidator::validate_password(&self.login_password) {
+                return Some(e);
+            }
+        }
+        
+        None
+    }
+
+    /// Check if login form is ready for submission
+    pub fn is_login_form_valid(&self) -> bool {
+        LoginValidator::validate_login_credentials(&self.login_username, &self.login_password).is_ok()
+    }
+
     /// Start Matrix sync
-    pub async fn start_matrix_sync(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start_matrix_sync(&mut self) -> NokResult<()> {
         if let Some(ref client) = self.matrix_client {
-            client.start_sync().await?;
+            client.start_sync().await
+                .map_err(|e| NokError::MatrixSyncError(e.to_string()))?;
             self.add_debug_log("Matrix sync started".to_string());
             Ok(())
         } else {
-            Err("Matrix client not initialized".into())
+            Err(NokError::MatrixClientNotInitialized)
         }
     }
 

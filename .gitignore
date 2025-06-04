@@ -111,3 +111,6 @@ Cargo.lock
 
 # Conduit database files
 backend/conduit/database/
+
+# Conduit binary (downloaded automatically)
+backend/conduit/conduit

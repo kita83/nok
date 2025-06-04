@@ -87,4 +87,13 @@ impl Config {
             format!("user_{}", Uuid::new_v4().to_string()[..8].to_lowercase())
         }
     }
+
+    /// Create legacy config from unified config (for backward compatibility)
+    pub fn from_unified(unified: &super::unified_config::UnifiedConfig) -> Self {
+        Self {
+            user_id: unified.user.user_id.clone(),
+            username: unified.user.username.clone(),
+            last_server_url: unified.legacy.server_url.clone(),
+        }
+    }
 }

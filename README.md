@@ -47,7 +47,7 @@ A terminal-based virtual office application built on the Matrix protocol, allowi
 cd backend/conduit
 ./start_conduit.sh
 ```
-The server will start on `http://localhost:6167` with domain `nok.local`.
+The script will automatically download the Conduit binary if needed, then start the server on `http://localhost:6167` with domain `nok.local`.
 
 ### 2. Create User Account
 ```bash

@@ -18,8 +18,13 @@ nok is a terminal-based virtual office application built on the Matrix protocol.
 
 ### Development Setup
 ```bash
-# Start Conduit homeserver
-cd backend/conduit && ./start_conduit.sh
+# Configure secure credentials (first time setup)
+cd backend/conduit
+cp .env.example .env
+# Edit .env with secure values for NOK_REGISTRATION_TOKEN and NOK_EMERGENCY_PASSWORD
+
+# Start Conduit homeserver (downloads binary automatically if needed)
+./start_conduit.sh
 
 # Build all binaries (main client + test tools)
 cargo build
@@ -69,8 +74,9 @@ ruff format
 - Uses `matrix-sdk` 0.11.0 with E2E encryption support
 - State storage via SQLite (`matrix_state.db`)
 - Custom event type `com.nok.knock` for knock functionality
-- Homeserver: `nok.local:6167` (configurable in `backend/conduit/conduit.toml`)
-- Registration token: `nokdev_registration_token`
+- Homeserver: `nok.local:6167` (configurable via environment variables)
+- Registration token: Set via `NOK_REGISTRATION_TOKEN` environment variable
+- Emergency password: Set via `NOK_EMERGENCY_PASSWORD` environment variable
 
 ### Project Structure
 - `src/matrix/`: Matrix client implementation and custom events
