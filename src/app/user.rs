@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct User {
     pub id: Option<String>, // 既存の内部ID（UUIDなど）
     pub matrix_id: Option<String>, // Matrix User ID (@username:domain形式)

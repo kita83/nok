@@ -15,7 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = MatrixConfig {
         homeserver_url: "http://localhost:6167".to_string(),
         server_name: "nok.local".to_string(),
-        state_store_path,
+        device_name: "test-client".to_string(),
+        state_store_path: state_store_path.clone(),
+        store_path: state_store_path,
     };
 
     // Matrixクライアント作成

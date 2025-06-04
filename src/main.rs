@@ -7,7 +7,7 @@ mod matrix;
 mod migration;
 
 use std::env;
-use app::App;
+use app::{App, NewApp};
 use migration::command::MigrationCommand;
 
 #[tokio::main]
@@ -50,36 +50,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Regular TUI mode
-    println!("🚀 Starting nok in TUI mode...");
+    println!("🚀 Starting nok in TUI mode with new architecture...");
 
-    // Create app instance
-    let mut app = App::new();
+    // Create new app instance with modular architecture
+    let app = NewApp::new();
 
-    // Check if already migrated to Matrix
-    if let Ok(config_migrator) = migration::config::ConfigMigrator::new() {
-        if config_migrator.matrix_config_exists() {
-            println!("📡 Matrix configuration detected - starting in Matrix mode");
-            // Initialize Matrix mode and set to login state
-            app.toggle_matrix_mode();
-            app.state = app::AppState::Login;
-            if let Err(e) = app.initialize_matrix().await {
-                eprintln!("❌ Failed to initialize Matrix mode: {}", e);
-                println!("💡 You may need to run migration first: nok --migrate");
-            }
-        } else {
-            println!("📻 Starting in legacy mode");
-            println!("💡 To migrate to Matrix, run: nok --migrate");
-        }
-    }
-
-    // Initialize connection
-    if let Err(e) = app.initialize_connection().await {
-        eprintln!("❌ Failed to initialize connection: {}", e);
-        eprintln!("💡 If you have migrated to Matrix, ensure Conduit is running");
-    }
-
-    // Start TUI
-    ui::run_app(app).await?;
+    // Start TUI with new architecture
+    ui::run_app_new(app).await?;
 
     Ok(())
 }

@@ -19,16 +19,23 @@ pub struct MatrixConfig {
     pub homeserver_url: String,
     /// Local server name (e.g., "nok.local")
     pub server_name: String,
+    /// Device name for this client
+    pub device_name: String,
     /// Database path for Matrix state storage
     pub state_store_path: String,
+    /// Store path (alias for state_store_path for compatibility)
+    pub store_path: String,
 }
 
 impl Default for MatrixConfig {
     fn default() -> Self {
+        let store_path = "matrix_state.db".to_string();
         Self {
             homeserver_url: "http://nok.local:6167".to_string(),
             server_name: "nok.local".to_string(),
-            state_store_path: "matrix_state.db".to_string(),
+            device_name: "nok-client".to_string(),
+            state_store_path: store_path.clone(),
+            store_path,
         }
     }
 }

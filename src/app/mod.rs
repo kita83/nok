@@ -21,8 +21,11 @@ pub use message::Message;
 pub use config::Config;
 
 // Re-export new modular components
-pub use core::{AppCore, UiState, DataState, LogState, NetworkState, PaneIdentifier, ConnectionStatus};
-pub use matrix_state::{MatrixState, LoginState, LoginField};
+pub use core::{AppCore, UiState, DataState, LogState, NetworkState};
+pub use core::PaneIdentifier as CorePaneIdentifier;
+pub use core::ConnectionStatus as CoreConnectionStatus;
+pub use matrix_state::{MatrixState, LoginState};
+pub use matrix_state::LoginField as MatrixLoginField;
 pub use legacy_state::LegacyState;
 pub use state_manager::{StateManager, CommunicationMode};
 pub use unified_config::{UnifiedConfig, AppConfig, UserConfig, MatrixConfigExt, LegacyConfig, UiConfig, LoggingConfig, NetworkConfig};

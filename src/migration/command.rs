@@ -48,7 +48,9 @@ impl MigrationCommand {
         let matrix_config = MatrixConfig {
             homeserver_url: format!("http://{}:6167", self.server_name),
             server_name: self.server_name.clone(),
+            device_name: "migration-client".to_string(),
             state_store_path: "migration_matrix_state.db".to_string(),
+            store_path: "migration_matrix_state.db".to_string(),
         };
 
         let matrix_client = MatrixClient::new(matrix_config).await?;

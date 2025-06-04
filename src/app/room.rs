@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Room {
     pub id: Option<String>,
     pub matrix_id: Option<String>,

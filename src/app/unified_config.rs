@@ -295,6 +295,7 @@ impl UnifiedConfig {
             homeserver_url: self.matrix.homeserver_url.clone(),
             server_name: self.matrix.server_name.clone(),
             device_name: self.matrix.device_name.clone(),
+            state_store_path: self.matrix.store_path.clone(),
             store_path: self.matrix.store_path.clone(),
         }
     }

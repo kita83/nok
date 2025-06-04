@@ -4,7 +4,7 @@ use super::legacy_state::LegacyState;
 use super::core::{AppCore, LogState};
 
 /// Communication mode selector
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CommunicationMode {
     Matrix,
     Legacy,
