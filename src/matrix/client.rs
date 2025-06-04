@@ -39,7 +39,7 @@ impl MatrixClient {
     /// Login with username and password
     pub async fn login(&self, username: &str, password: &str) -> Result<(), matrix_sdk::Error> {
         let user_id_str = format!("@{}:{}", username, self.config.server_name);
- let user_id = OwnedUserId::parse(&user_id_str)?;
+        let user_id = UserId::parse(&user_id_str)?;
 
         self.inner
             .matrix_auth()
