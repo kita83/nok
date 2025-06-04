@@ -25,6 +25,25 @@ use ui::{ui, TabView};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // コマンドライン引数でオーディオテストをチェック
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && args[1] == "--test-audio" {
+        println!("Testing knock sound...");
+        match nok::audio::play_knock_sound() {
+            Ok(_) => println!("✅ Knock sound played successfully!"),
+            Err(e) => println!("❌ Error playing knock sound: {}", e),
+        }
+        return Ok(());
+    }
+
+    if args.len() > 1 && args[1] == "--test-knock" {
+        println!("Testing knock method...");
+        let mut app = App::new();
+        app.knock("TestUser");
+        println!("✅ Knock method called successfully!");
+        return Ok(());
+    }
+
     // Setup terminal immediately (no console output before this)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -132,22 +151,7 @@ async fn run_app<B: ratatui::backend::Backend>(
                             app.add_debug_log("Enter key pressed".to_string());
                             app.handle_confirm_key();
                         },
-                        KeyCode::Char('n') => {
-                            if app.focused_pane == app::PaneIdentifier::Users {
-                                if let Some(user) = app.get_selected_user() {
-                                    let username = user.name.clone();
-                                    if let (Some(sender_id), Some(target_id)) = (&app.current_user.id, &user.id) {
-                                        if let Err(e) = app.websocket_client.send_knock(sender_id, target_id) {
-                                            app.set_error(format!("Failed to send knock: {}", e));
-                                        } else {
-                                            app.notification = Some(format!("Knocked on {}", username));
-                                        }
-                                    }
-                                } else {
-                                    app.set_error("No user selected to knock.".to_string());
-                                }
-                            }
-                        },
+
                         KeyCode::F(5) => {
                             // F5キーで再接続
                             match app.reconnect().await {

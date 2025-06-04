@@ -14,17 +14,24 @@ class WebSocketManager:
         self.active_connections: dict[str, WebSocket] = {}
         # ルームメンバーを管理 {room_id: {user_id, ...}}
         self.room_members: dict[str, set[str]] = {}
+        # ユーザーのリアルタイムステータス管理 {user_id: status}
+        self.user_status: dict[str, str] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str):
         """WebSocket接続を受け入れる"""
         await websocket.accept()
         self.active_connections[user_id] = websocket
+        # デフォルトでオンラインステータスに設定
+        self.user_status[user_id] = "online"
         logger.info(f"User {user_id} connected via WebSocket")
 
     async def disconnect(self, user_id: str):
         """WebSocket接続を切断する"""
         if user_id in self.active_connections:
             del self.active_connections[user_id]
+
+        # ユーザーをオフラインステータスに変更
+        self.user_status[user_id] = "offline"
 
         # ユーザーを全ルームから削除
         for room_id in list(self.room_members.keys()):
@@ -91,3 +98,17 @@ class WebSocketManager:
     def is_user_online(self, user_id: str) -> bool:
         """ユーザーがオンラインかどうかを確認"""
         return user_id in self.active_connections
+
+    def update_user_status(self, user_id: str, status: str):
+        """ユーザーのステータスを更新（リアルタイム管理）"""
+        if status in ["online", "away", "busy", "offline"]:
+            self.user_status[user_id] = status
+            logger.info(f"User {user_id} status updated to {status}")
+
+    def get_user_status(self, user_id: str) -> str:
+        """ユーザーの現在のステータスを取得"""
+        return self.user_status.get(user_id, "offline")
+
+    def get_all_user_statuses(self) -> dict[str, str]:
+        """全ユーザーのステータスを取得"""
+        return self.user_status.copy()

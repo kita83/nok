@@ -56,6 +56,8 @@ pub struct App {
     // 設定画面用のログ
     pub settings_logs: Vec<String>,
     pub should_reconnect: bool,
+    // ステータス設定用
+    pub status_selection_index: usize,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -101,6 +103,7 @@ impl App {
             config: config.clone(),
             settings_logs: Vec::new(),
             should_reconnect: false,
+            status_selection_index: 0, // 0=Online, 1=Away, 2=Busy
         };
 
         // 設定ファイル読み込み状況をデバッグログに追加
@@ -133,12 +136,8 @@ impl App {
                 }
             } else {
                 self.current_user.id = Some(existing_user.id.clone());
-                self.current_user.status = match existing_user.status.as_str() {
-                    "online" => UserStatus::Online,
-                    "away" => UserStatus::Away,
-                    "busy" => UserStatus::Busy,
-                    _ => UserStatus::Offline,
-                };
+                // DBのステータスは使わず、接続時にOnlineにする
+                // WebSocket接続後に正しいステータスが設定される
                 found_existing_user = true;
             }
         }
@@ -162,11 +161,19 @@ impl App {
         // データを初期読み込み
         self.refresh_data().await?;
 
-        // WebSocket接続
+                // WebSocket接続
         if let Some(ref user_id) = self.current_user.id {
-            if let Err(e) = self.websocket_client.connect(user_id).await {
+            let user_id_clone = user_id.clone();
+            if let Err(e) = self.websocket_client.connect(&user_id_clone).await {
                 self.connection_status = ConnectionStatus::Error(format!("WebSocket connection failed: {}", e));
                 return Err(e);
+            }
+            // WebSocket接続成功後、自分のステータスをOnlineに設定
+            self.current_user.update_status(UserStatus::Online);
+
+            // users一覧内の自分のステータスも同期更新
+            if let Some(user_in_list) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(&user_id_clone)) {
+                user_in_list.update_status(UserStatus::Online);
             }
         }
 
@@ -204,6 +211,18 @@ impl App {
         match self.api_client.get_users().await {
             Ok(api_users) => {
                 self.users = api_users.into_iter().map(|u| u.into()).collect();
+
+                // 自分がユーザー一覧に含まれていない場合は追加
+                // 含まれている場合は自分の最新ステータスで更新
+                if let Some(ref my_id) = self.current_user.id {
+                    if let Some(user_in_list) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(my_id)) {
+                        // 既にリストにいる場合は、current_userのステータスで更新
+                        user_in_list.update_status(self.current_user.status.clone());
+                    } else {
+                        // リストにいない場合は追加
+                        self.users.push(self.current_user.clone());
+                    }
+                }
             }
             Err(e) => {
                 self.set_error(format!("Failed to load users: {}", e));
@@ -283,15 +302,21 @@ impl App {
                 }
                 "user_status" => {
                     if let (Some(user_id), Some(status)) = (ws_message.user_id, ws_message.status) {
-                        // ユーザーステータスを更新
+                        let new_status = match status.as_str() {
+                            "online" => UserStatus::Online,
+                            "away" => UserStatus::Away,
+                            "busy" => UserStatus::Busy,
+                            _ => UserStatus::Offline,
+                        };
+
+                        // 他のユーザーのステータスを更新
                         if let Some(user) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(&user_id)) {
-                            let new_status = match status.as_str() {
-                                "online" => UserStatus::Online,
-                                "away" => UserStatus::Away,
-                                "busy" => UserStatus::Busy,
-                                _ => UserStatus::Offline,
-                            };
-                            user.update_status(new_status);
+                            user.update_status(new_status.clone());
+                        }
+
+                        // 自分のステータスも更新（自分のステータス変更の場合）
+                        if self.current_user.id.as_ref() == Some(&user_id) {
+                            self.current_user.update_status(new_status);
                         }
                     }
                 }
@@ -378,16 +403,37 @@ impl App {
                                         self.set_error(format!("Failed to send knock: {}", e));
                                     } else {
                                         self.notification = Some(format!("Knocked on {}", user.name));
+                                        if let Err(e) = crate::audio::play_knock_sound() {
+                                            self.add_debug_log(format!("Error playing knock sound on send: {}", e));
+                                        }
                                     }
                                 }
                             }
                         }
                     },
+
                     _ => {}
                 }
             },
             AppState::Settings => {
                 match key.code {
+                    KeyCode::Tab => {
+                        // ステータス選択を循環
+                        self.status_selection_index = (self.status_selection_index + 1) % 3;
+                        let status_names = ["Online", "Away", "Busy"];
+                        self.add_settings_log(format!("Status selection: {}", status_names[self.status_selection_index]));
+                    },
+                    KeyCode::Char(' ') => {
+                        // スペースキーでステータス変更を適用
+                        let new_status = match self.status_selection_index {
+                            0 => UserStatus::Online,
+                            1 => UserStatus::Away,
+                            2 => UserStatus::Busy,
+                            _ => UserStatus::Online,
+                        };
+                        self.add_settings_log(format!("Status changed to {:?}", new_status));
+                        self.change_my_status(new_status);
+                    },
                     KeyCode::Enter => {
                         // ユーザー名を保存
                         if !self.username_edit_buffer.trim().is_empty() {
@@ -585,8 +631,8 @@ impl App {
     pub fn knock(&mut self, target_user: &str) {
         self.notification = Some(format!("Knocked on {}", target_user));
         // Play knock sound
-        if let Err(_) = crate::audio::play_knock_sound() {
-            // Silently handle audio errors
+        if let Err(e) = crate::audio::play_knock_sound() {
+            self.add_debug_log(format!("Error playing knock sound: {}", e));
         }
     }
 
@@ -619,6 +665,52 @@ impl App {
             let current = self.selected_user.unwrap_or(0);
             self.selected_user = Some((current + 1) % self.users.len());
         }
+    }
+
+    pub fn change_my_status(&mut self, new_status: UserStatus) {
+        // 現在のステータスと同じ場合は何もしない
+        if self.current_user.status == new_status {
+            return;
+        }
+
+        let old_status = self.current_user.status.clone();
+        self.current_user.update_status(new_status.clone());
+
+        // users一覧内の自分のステータスも同期更新
+        if let Some(ref my_id) = self.current_user.id {
+            if let Some(user_in_list) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(my_id)) {
+                user_in_list.update_status(new_status.clone());
+                self.add_debug_log(format!("Synced my status in users list: {:?}", new_status));
+            } else {
+                self.add_debug_log("Warning: My user not found in users list for status sync".to_string());
+            }
+        }
+
+        let status_str = match new_status {
+            UserStatus::Online => "online",
+            UserStatus::Away => "away",
+            UserStatus::Busy => "busy",
+            UserStatus::Offline => "offline",
+        };
+
+        // WebSocketでステータス変更を送信
+        if let Some(ref user_id) = self.current_user.id {
+            let user_id_clone = user_id.clone();
+            if let Err(e) = self.websocket_client.update_status(&user_id_clone, status_str) {
+                self.set_error(format!("Failed to update status: {}", e));
+                // エラーの場合は元のステータスに戻す
+                self.current_user.update_status(old_status.clone());
+                // users一覧内の自分のステータスも戻す
+                if let Some(user_in_list) = self.users.iter_mut().find(|u| u.id.as_ref() == Some(&user_id_clone)) {
+                    user_in_list.update_status(old_status);
+                }
+                return;
+            }
+        }
+
+        // ステータス変更を通知
+        self.notification = Some(format!("Status changed to {:?}", new_status));
+        self.add_debug_log(format!("Status changed from {:?} to {:?}", old_status, new_status));
     }
 
     // ユーザーと部屋の関連付けを更新

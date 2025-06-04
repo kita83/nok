@@ -41,6 +41,10 @@ app.add_middleware(
 websocket_manager = WebSocketManager()
 event_dispatcher = EventDispatcher(websocket_manager)
 
+# WebSocketManagerを依存性注入で利用可能にする
+def get_websocket_manager():
+    return websocket_manager
+
 # ルーター登録
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
@@ -112,6 +116,11 @@ async def handle_websocket_message(user_id: str, message_data: dict):
     elif message_type == "leave_room":
         room_id = message_data.get("room_id")
         await event_dispatcher.dispatch_room_leave(user_id, room_id)
+
+    elif message_type == "user_status":
+        status = message_data.get("status")
+        if status in ["online", "away", "busy", "offline"]:
+            await event_dispatcher.dispatch_user_status_change(user_id, status)
 
 
 if __name__ == "__main__":
