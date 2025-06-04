@@ -39,11 +39,11 @@ impl MatrixClient {
     /// Login with username and password
     pub async fn login(&self, username: &str, password: &str) -> Result<(), matrix_sdk::Error> {
         let user_id_str = format!("@{}:{}", username, self.config.server_name);
-        let user_id = UserId::parse(&user_id_str)?;
+ let user_id = OwnedUserId::parse(&user_id_str)?;
 
         self.inner
             .matrix_auth()
-            .login_username(user_id, password)
+            .login_username(&user_id, password)
             .send()
             .await?;
 
@@ -53,6 +53,11 @@ impl MatrixClient {
 
     /// Start syncing with the homeserver
     pub async fn start_sync(&self) -> Result<(), matrix_sdk::Error> {
+        // Check if sync is already running
+        if self.sync_handle.read().await.is_some() {
+            return Ok(()); // Early return to prevent multiple sync threads
+        }
+
         let client = self.inner.clone();
         let handle = tokio::spawn(async move {
             if let Err(e) = client.sync(SyncSettings::default()).await {

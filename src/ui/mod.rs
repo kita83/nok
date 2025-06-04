@@ -1,10 +1,17 @@
+use std::time::Duration;
+use crossterm::{
+    event::{self, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
 use ratatui::{
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
-    Frame,
+    Frame, Terminal,
 };
+use tokio::time;
 
 use crate::app::{App, AppState, PaneIdentifier};
 
@@ -480,4 +487,137 @@ fn render_main_ui(f: &mut Frame, app: &mut App) {
         .style(Style::default().fg(Color::DarkGray))
         .wrap(Wrap { trim: true });
     f.render_widget(debug_paragraph, debug_content_area);
+}
+
+/// Main TUI application loop
+pub async fn run_app(app: App) -> Result<(), Box<dyn std::error::Error>> {
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = std::io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
+
+    // Run main loop
+    let result = run_app_loop(&mut terminal, app).await;
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+    )?;
+    terminal.show_cursor()?;
+
+    result
+}
+
+async fn run_app_loop<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    mut app: App,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut last_tick = std::time::Instant::now();
+    let tick_rate = Duration::from_millis(250);
+
+    // Initial draw
+    terminal.draw(|f| ui(f, &mut app))?;
+
+    loop {
+        let timeout = tick_rate
+            .checked_sub(last_tick.elapsed())
+            .unwrap_or_else(|| Duration::from_secs(0));
+
+        // Check for key input
+        if crossterm::event::poll(timeout)? {
+            match event::read()? {
+                Event::Key(key) => {
+                    // Settings screen has priority
+                    if app.state == AppState::Settings {
+                        app.add_settings_log(format!("Settings key pressed: {:?}", key.code));
+                        app.handle_key(key);
+                        terminal.draw(|f| ui(f, &mut app))?;
+                        continue;
+                    }
+
+                    match key.code {
+                        KeyCode::Char('q') => {
+                            app.add_debug_log("Quit key pressed".to_string());
+                            break;
+                        },
+                        KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                            app.add_debug_log("Ctrl+C received".to_string());
+                            break;
+                        },
+                        KeyCode::Tab => {
+                            app.add_debug_log("Tab key pressed - cycling focus".to_string());
+                            app.cycle_focus(false);
+                        },
+                        KeyCode::Up => {
+                            app.add_debug_log("Up key pressed".to_string());
+                            app.handle_up_key();
+                        },
+                        KeyCode::Down => {
+                            app.add_debug_log("Down key pressed".to_string());
+                            app.handle_down_key();
+                        },
+                        KeyCode::Enter => {
+                            app.add_debug_log("Enter key pressed".to_string());
+                            app.handle_confirm_key();
+                        },
+                        KeyCode::F(5) => {
+                            // F5 key for reconnection
+                            match app.reconnect().await {
+                                Ok(_) => {
+                                    app.notification = Some("Reconnected successfully!".to_string());
+                                }
+                                Err(e) => {
+                                    app.set_error(format!("Reconnection failed: {}", e));
+                                }
+                            }
+                        },
+                        _ => {
+                            app.handle_key(key);
+                        }
+                    }
+
+                    // Redraw after key input
+                    terminal.draw(|f| ui(f, &mut app))?;
+                }
+                _ => {} // Ignore other events
+            }
+        }
+
+        // Regular update processing
+        if last_tick.elapsed() >= tick_rate {
+            // Execute reconnection if flag is set
+            if app.should_reconnect {
+                app.should_reconnect = false;
+                match app.reconnect().await {
+                    Ok(_) => {
+                        app.add_settings_log("Automatic reconnection successful!".to_string());
+                        app.notification = Some("Reconnected successfully with new username!".to_string());
+                    }
+                    Err(e) => {
+                        app.add_settings_log(format!("Automatic reconnection failed: {}", e));
+                        app.set_error(format!("Reconnection failed: {}", e));
+                    }
+                }
+            }
+
+            // Process WebSocket messages safely
+            tokio::select! {
+                _ = app.handle_websocket_message() => {}
+                _ = time::sleep(Duration::from_millis(10)) => {}
+            }
+
+            // Regular redraw
+            terminal.draw(|f| ui(f, &mut app))?;
+
+            app.tick();
+            last_tick = std::time::Instant::now();
+        }
+    }
+
+    Ok(())
 }

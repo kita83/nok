@@ -26,7 +26,7 @@ pub struct MatrixConfig {
 impl Default for MatrixConfig {
     fn default() -> Self {
         Self {
-            homeserver_url: "http://localhost:8008".to_string(),
+            homeserver_url: "http://nok.local:6167".to_string(),
             server_name: "nok.local".to_string(),
             state_store_path: "matrix_state.db".to_string(),
         }

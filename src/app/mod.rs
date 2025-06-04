@@ -279,8 +279,8 @@ impl App {
     pub async fn send_matrix_knock(&mut self, room_id: &str, target_user: &str) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref client) = self.matrix_client {
             use matrix_sdk::ruma::{RoomId, UserId};
-            let room_id = RoomId::parse(room_id)?;
-            let target_user_id = UserId::parse(target_user)?;
+            let room_id = RoomId::parse(room_id)?.to_owned();
+            let target_user_id = UserId::parse(target_user)?.to_owned();
             client.send_knock(&room_id, &target_user_id).await?;
             self.add_debug_log(format!("Sent Matrix knock to {}", target_user));
             Ok(())
