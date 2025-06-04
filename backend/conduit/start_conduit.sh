@@ -3,8 +3,16 @@
 # Conduit起動スクリプト
 # Usage: ./start_conduit.sh
 
+set -e
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR"
+
+# Conduitバイナリが存在しない場合はダウンロード
+if [ ! -f "./conduit" ]; then
+    echo "🔍 Conduit binary not found. Downloading..."
+    ./download_conduit.sh
+fi
 
 echo "🚀 Starting Conduit homeserver..."
 echo "📍 Server: nok.local:6167"
