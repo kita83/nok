@@ -1,6 +1,7 @@
 🚧 このプロジェクトは現在アクティブに開発中であり、本番環境での使用にはまだ適していません。
 
-nok は、分散型チームがCLI（コマンドライン）から「今ここにいる」感覚を得られるようにする、ミニマリストなターミナルベースのバーチャルオフィスツールです。ドアをノックするというシンプルな行為にインスパイアされており、リモートファーストのチームに、存在感の共有とリアルタイムなコミュニケーションを穏やかな「コンコン」と共に届けます。
+# about
+nok is a terminal-based client for Matrix. It is a minimalistic terminal-based virtual office tool that allows distributed teams to feel "here now" from the CLI. Inspired by the simple act of knocking on a door, it delivers shared presence and real-time communication to remote-first teams with a soothing "konkon" sound.
 
 ⚙️ 主な機能
 * ターミナルUI (TUI)：ratatuiを使用した軽量でレトロな雰囲気。開発者のワークフローに自然に溶け込む

@@ -3,6 +3,7 @@ mod ui;
 mod audio;
 mod util;
 mod api;
+mod matrix;
 
 use std::io;
 use std::time::Duration;

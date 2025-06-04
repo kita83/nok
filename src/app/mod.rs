@@ -13,6 +13,7 @@ pub use message::Message;
 pub use config::Config;
 use crate::ui::TabView;
 use crate::api::{ApiClient, WebSocketClient};
+use crate::matrix::{MatrixClient, MatrixConfig};
 use chrono;
 
 
@@ -58,6 +59,10 @@ pub struct App {
     pub should_reconnect: bool,
     // ステータス設定用
     pub status_selection_index: usize,
+    // Matrix client
+    pub matrix_client: Option<MatrixClient>,
+    pub matrix_config: MatrixConfig,
+    pub matrix_mode: bool, // Matrix mode有効フラグ
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -104,6 +109,9 @@ impl App {
             settings_logs: Vec::new(),
             should_reconnect: false,
             status_selection_index: 0, // 0=Online, 1=Away, 2=Busy
+            matrix_client: None,
+            matrix_config: MatrixConfig::default(),
+            matrix_mode: false,
         };
 
         // 設定ファイル読み込み状況をデバッグログに追加
@@ -202,6 +210,82 @@ impl App {
                 self.add_settings_log(format!("Reconnection failed: {}", e));
                 Err(e)
             }
+        }
+    }
+
+    /// Initialize Matrix client
+    pub async fn initialize_matrix(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.matrix_mode {
+            self.add_debug_log("Initializing Matrix client...".to_string());
+
+            let matrix_client = crate::matrix::MatrixClient::new(self.matrix_config.clone()).await?;
+            self.matrix_client = Some(matrix_client);
+
+            self.add_debug_log("Matrix client initialized successfully".to_string());
+            Ok(())
+        } else {
+            self.add_debug_log("Matrix mode disabled, skipping Matrix initialization".to_string());
+            Ok(())
+        }
+    }
+
+    /// Login to Matrix homeserver
+    pub async fn matrix_login(&mut self, username: &str, password: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+            client.login(username, password).await?;
+
+            // Update current user with Matrix ID
+            let matrix_id = format!("@{}:{}", username, self.matrix_config.server_name);
+            self.current_user.set_matrix_id(matrix_id);
+
+            self.add_debug_log(format!("Logged into Matrix as {}", username));
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
+        }
+    }
+
+    /// Start Matrix sync
+    pub async fn start_matrix_sync(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+            client.start_sync().await?;
+            self.add_debug_log("Matrix sync started".to_string());
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
+        }
+    }
+
+    /// Toggle Matrix mode
+    pub fn toggle_matrix_mode(&mut self) {
+        self.matrix_mode = !self.matrix_mode;
+        self.add_debug_log(format!("Matrix mode: {}", if self.matrix_mode { "enabled" } else { "disabled" }));
+    }
+
+    /// Send message via Matrix (when in Matrix mode)
+    pub async fn send_matrix_message(&mut self, room_id: &str, content: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+            use matrix_sdk::ruma::RoomId;
+            let room_id = RoomId::parse(room_id)?;
+            client.send_message(&room_id, content).await?;
+            self.add_debug_log(format!("Sent Matrix message: {}", content));
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
+        }
+    }
+
+    /// Send knock via Matrix (when in Matrix mode)
+    pub async fn send_matrix_knock(&mut self, room_id: &str, target_user: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+            use matrix_sdk::ruma::{RoomId, UserId};
+            let room_id = RoomId::parse(room_id)?;
+            let target_user_id = UserId::parse(target_user)?;
+            client.send_knock(&room_id, &target_user_id).await?;
+            self.add_debug_log(format!("Sent Matrix knock to {}", target_user));
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
         }
     }
 
@@ -518,14 +602,29 @@ impl App {
 
     // メッセージ送信
     pub fn send_message(&mut self, content: &str) {
-        if let Some(room) = self.rooms.get(self.current_room) {
-            if let (Some(sender_id), Some(room_id)) = (&self.current_user.id, &room.id) {
-                if let Err(e) = self.websocket_client.send_room_message(sender_id, room_id, content) {
-                    self.set_error(format!("Failed to send message: {}", e));
-                    return;
+        // Matrix mode時はMatrix APIを使用
+        if self.matrix_mode {
+            let room_id = if let Some(room) = self.rooms.get(self.current_room) {
+                room.matrix_id.clone().unwrap_or_else(|| "!general:nok.local".to_string())
+            } else {
+                "!general:nok.local".to_string()
+            };
+
+            self.add_debug_log(format!("Queued Matrix message to room {}: {}", room_id, content));
+            // TODO: Matrix message送信を非同期タスクに追加
+            return;
+        }
+
+        // 既存のWebSocket経由メッセージ送信
+        if let Some(user_id) = &self.current_user.id {
+            if let Some(room) = self.rooms.get(self.current_room) {
+                if let Some(room_id) = &room.id {
+                    if let Err(e) = self.websocket_client.send_room_message(user_id, room_id, content) {
+                        self.set_error(format!("Failed to send message: {}", e));
+                    } else {
+                        self.notification = Some("Message sent".to_string());
+                    }
                 }
-                // メッセージ送信成功時は通知を表示
-                self.notification = Some("Message sent!".to_string());
             }
         }
     }
@@ -629,10 +728,60 @@ impl App {
     }
 
     pub fn knock(&mut self, target_user: &str) {
+        // Matrix mode時はMatrix APIを使用
+        if self.matrix_mode {
+            if let Some(target_user_obj) = self.get_selected_user() {
+                if let Some(matrix_id) = &target_user_obj.matrix_id {
+                    // デフォルトルームまたは現在のルームでknock
+                    let room_id = if let Some(room) = self.rooms.get(self.current_room) {
+                        room.matrix_id.clone().unwrap_or_else(|| "!general:nok.local".to_string())
+                    } else {
+                        "!general:nok.local".to_string()
+                    };
+
+                    // 非同期処理なので、ここではMatrix knockリクエストをキューに追加
+                    self.add_debug_log(format!("Queued Matrix knock to {} in room {}", matrix_id, room_id));
+                    // TODO: Matrix knock実行を非同期タスクに追加
+                } else {
+                    self.add_debug_log("Target user has no Matrix ID".to_string());
+                }
+            }
+        }
+
+        // 既存のknock処理（音声再生など）
         self.notification = Some(format!("Knocked on {}", target_user));
-        // Play knock sound
         if let Err(e) = crate::audio::play_knock_sound() {
             self.add_debug_log(format!("Error playing knock sound: {}", e));
+        }
+    }
+
+        /// Matrix版knock（async）
+    pub async fn knock_matrix(&mut self, target_user: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // 最初にmatrix_idをcloneして取得
+        let matrix_id = if let Some(target_user_obj) = self.users.iter().find(|u| u.name == target_user) {
+            target_user_obj.matrix_id.clone()
+        } else {
+            return Err("Target user not found".into());
+        };
+
+        if let Some(matrix_id) = matrix_id {
+            // デフォルトルームまたは現在のルームでknock
+            let room_id = if let Some(room) = self.rooms.get(self.current_room) {
+                room.matrix_id.clone().unwrap_or_else(|| "!general:nok.local".to_string())
+            } else {
+                "!general:nok.local".to_string()
+            };
+
+            self.send_matrix_knock(&room_id, &matrix_id).await?;
+
+            // 音声も再生
+            if let Err(e) = crate::audio::play_knock_sound() {
+                self.add_debug_log(format!("Error playing knock sound: {}", e));
+            }
+
+            Ok(())
+        } else {
+            Err("Target user has no Matrix ID".into())
         }
     }
 
@@ -756,5 +905,140 @@ impl App {
                 self.set_error(format!("User '{}' not found", target));
             }
         }
+    }
+
+    /// Matrix版message送信（async）
+    pub async fn send_message_matrix(&mut self, content: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let room_id = if let Some(room) = self.rooms.get(self.current_room) {
+            room.matrix_id.clone().unwrap_or_else(|| "!general:nok.local".to_string())
+        } else {
+            "!general:nok.local".to_string()
+        };
+
+        self.send_matrix_message(&room_id, content).await?;
+        self.notification = Some("Message sent via Matrix".to_string());
+        Ok(())
+    }
+
+    /// プレゼンス更新をMatrix対応
+    pub async fn update_presence_matrix(&mut self, status: UserStatus) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+            // PresenceManagerを使ってプレゼンス更新
+            use crate::matrix::PresenceManager;
+            let presence_manager = PresenceManager::new(client.inner().clone());
+            presence_manager.set_presence(status.clone(), None).await?;
+
+            // ローカル状態も更新
+            self.current_user.update_status(status.clone());
+            self.add_debug_log(format!("Updated Matrix presence to {:?}", status));
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
+        }
+    }
+
+    /// Matrix syncからルーム一覧を更新
+    pub async fn sync_matrix_rooms(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+                        let matrix_rooms = client.rooms();
+            let rooms_count = matrix_rooms.len();
+
+            // 既存のMatrix ルームを更新
+            for matrix_room in matrix_rooms {
+                let room_id = matrix_room.room_id().to_string();
+                let display_name = matrix_room.display_name().await
+                    .map(|name| name.to_string())
+                    .unwrap_or_else(|_| room_id.clone());
+
+                // 既存ルームを検索、なければ作成
+                if let Some(existing_room) = self.rooms.iter_mut()
+                    .find(|r| r.matrix_id.as_ref() == Some(&room_id)) {
+                    // 既存ルームを更新
+                    existing_room.name = display_name.clone();
+                    existing_room.set_member_count(matrix_room.active_members_count() as usize);
+                    // is_encrypted()メソッドがないため、一旦falseに設定
+                    existing_room.set_encrypted(false);
+
+                    // トピック更新
+                    if let Some(topic) = matrix_room.topic() {
+                        existing_room.set_topic(Some(topic.to_string()));
+                    }
+                } else {
+                    // 新しいルームを作成
+                    let mut room = Room::from_matrix_room(room_id, display_name);
+                    room.set_member_count(matrix_room.active_members_count() as usize);
+                    // is_encrypted()メソッドがないため、一旦falseに設定
+                    room.set_encrypted(false);
+
+                    if let Some(topic) = matrix_room.topic() {
+                        room.set_topic(Some(topic.to_string()));
+                    }
+
+                    self.rooms.push(room);
+                }
+            }
+
+            self.add_debug_log(format!("Synced {} Matrix rooms", rooms_count));
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
+        }
+    }
+
+    /// Matrix syncからメンバー一覧を更新
+    pub async fn sync_matrix_users(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(ref client) = self.matrix_client {
+            let mut all_users = std::collections::HashSet::new();
+
+                        // 全ルームからメンバーを取得
+            let matrix_rooms = client.rooms();
+            for matrix_room in &matrix_rooms {
+                use matrix_sdk::RoomMemberships;
+                let members = matrix_room.members(RoomMemberships::all()).await?;
+                for member in members {
+                    let user_id = member.user_id().to_string();
+                    let display_name = member.display_name().map(|name| name.to_string()).unwrap_or_else(|| {
+                        // Display nameがなければMatrix User IDからユーザー名を抽出
+                        crate::app::user::extract_username_from_matrix_id(&user_id)
+                    });
+
+                    all_users.insert((user_id, display_name));
+                }
+            }
+
+            // 既存ユーザーリストを更新
+            for (matrix_id, display_name) in all_users {
+                if let Some(existing_user) = self.users.iter_mut()
+                    .find(|u| u.matrix_id.as_ref() == Some(&matrix_id)) {
+                    // 既存ユーザーを更新
+                    existing_user.name = display_name;
+                } else {
+                    // 新しいユーザーを作成
+                    let mut user = User::from_matrix_id(matrix_id);
+                    user.name = display_name;
+                    self.users.push(user);
+                }
+            }
+
+            self.add_debug_log(format!("Synced {} Matrix users", self.users.len()));
+            Ok(())
+        } else {
+            Err("Matrix client not initialized".into())
+        }
+    }
+
+    /// Matrix mode時にのみMatrix sync処理を実行
+    pub async fn matrix_sync_tick(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.matrix_mode && self.matrix_client.is_some() {
+            // 定期的にMatrix ルーム・ユーザー情報を同期
+            if let Err(e) = self.sync_matrix_rooms().await {
+                self.add_debug_log(format!("Matrix rooms sync error: {}", e));
+            }
+
+            if let Err(e) = self.sync_matrix_users().await {
+                self.add_debug_log(format!("Matrix users sync error: {}", e));
+            }
+        }
+        Ok(())
     }
 }
