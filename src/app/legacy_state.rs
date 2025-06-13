@@ -77,7 +77,7 @@ impl LegacyState {
     }
 
     /// Send a knock message via legacy API
-    pub async fn send_knock(&self, target_user_id: &str) -> NokResult<()> {
+    pub async fn send_knock(&self, _target_user_id: &str) -> NokResult<()> {
         if !self.enabled || !self.is_connected() {
             return Err(NokError::ConnectionFailed("Not connected to legacy server".to_string()));
         }

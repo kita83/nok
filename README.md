@@ -1,6 +1,6 @@
-# nok - Matrix Edition
+# nok
 
-A terminal-based virtual office application built on the Matrix protocol, allowing team members to see each other's presence and send quick "knocks" to get attention through Matrix homeserver infrastructure.
+A terminal-based chat application built on the Matrix protocol, allowing team members to see each other's presence and send quick "knocks" to get attention through Matrix homeserver infrastructure.
 
 🚧 **Status**: Matrix migration completed! This is the Matrix-compliant version of nok.
 

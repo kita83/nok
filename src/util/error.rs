@@ -134,6 +134,12 @@ impl From<serde_json::Error> for NokError {
     }
 }
 
+impl From<Box<dyn std::error::Error>> for NokError {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        NokError::InternalError(err.to_string())
+    }
+}
+
 // Result type alias for convenience
 pub type NokResult<T> = Result<T, NokError>;
 

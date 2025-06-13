@@ -93,7 +93,7 @@ impl Config {
         Self {
             user_id: unified.user.user_id.clone(),
             username: unified.user.username.clone(),
-            last_server_url: unified.legacy.server_url.clone(),
+            last_server_url: Some(unified.legacy.server_url.clone()),
         }
     }
 }

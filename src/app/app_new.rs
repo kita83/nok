@@ -58,8 +58,8 @@ impl App {
         current_user.id = Some(config.user.user_id.clone());
         
         // Initialize API clients using legacy config
-        let api_client = ApiClient::new(config.legacy.server_url.clone());
-        let websocket_client = WebSocketClient::new(config.legacy.websocket_endpoint.clone());
+        let api_client = ApiClient::new();
+        let websocket_client = WebSocketClient::new();
         
         // Create Matrix and Legacy states
         let matrix_config = config.to_matrix_config();
@@ -274,6 +274,19 @@ impl App {
                 // Start Matrix sync
                 if let Err(e) = self.state_manager.matrix().start_sync().await {
                     self.logs.add_debug_log(format!("Failed to start sync: {}", e));
+                } else {
+                    self.logs.add_debug_log("Matrix sync started successfully".to_string());
+                    
+                    // Wait longer for initial sync and then load rooms
+                    self.logs.add_debug_log("Waiting for Matrix sync to stabilize...".to_string());
+                    tokio::time::sleep(tokio::time::Duration::from_millis(3000)).await;
+                    
+                    self.logs.add_debug_log("Attempting to sync rooms from Matrix...".to_string());
+                    if let Err(e) = self.sync_rooms_from_matrix().await {
+                        self.logs.add_debug_log(format!("Failed to sync rooms: {}", e));
+                    } else {
+                        self.logs.add_debug_log("Room sync completed successfully".to_string());
+                    }
                 }
                 
                 // Update network state
@@ -308,17 +321,17 @@ impl App {
 
     /// Process input command
     async fn process_input(&mut self) -> NokResult<()> {
-        let input = self.ui.input.trim();
+        let input = self.ui.input.trim().to_string();
         
         if input.starts_with("/") {
             // Handle commands
-            self.process_command(input).await?;
+            self.process_command(&input).await?;
         } else if input.starts_with("nok @") {
             // Handle knock command
-            self.process_knock_command(input).await?;
+            self.process_knock_command(&input).await?;
         } else {
             // Regular message
-            self.send_message(input).await?;
+            self.send_message(&input).await?;
         }
 
         self.ui.clear_input();
@@ -329,7 +342,7 @@ impl App {
     async fn process_command(&mut self, command: &str) -> NokResult<()> {
         let parts: Vec<&str> = command.split_whitespace().collect();
         
-        match parts.get(0) {
+        match parts.get(0).copied() {
             Some("/help") => {
                 self.show_help();
             }
@@ -357,7 +370,7 @@ impl App {
             let username = username.trim();
             
             // Find user and send knock
-            if let Some(user) = self.data.users.iter().find(|u| u.name == username) {
+            if let Some(_user) = self.data.users.iter().find(|u| u.name == username) {
                 self.logs.add_debug_log(format!("Knocking {}", username));
                 // Implementation would depend on Matrix vs legacy mode
             } else {
@@ -369,7 +382,7 @@ impl App {
     }
 
     /// Send a regular message
-    async fn send_message(&mut self, message: &str) -> NokResult<()> {
+    async fn send_message(&mut self, _message: &str) -> NokResult<()> {
         if let Some(room) = self.data.get_current_room() {
             self.logs.add_debug_log(format!("Sending message to room: {}", room.name));
             // Implementation would depend on Matrix vs legacy mode
@@ -514,6 +527,70 @@ Keys:
         self.core.config.save();
         
         self.logs.add_debug_log("Application shutdown complete".to_string());
+        Ok(())
+    }
+
+    /// Sync Matrix rooms to UI state
+    async fn sync_rooms_from_matrix(&mut self) -> NokResult<()> {
+        self.logs.add_debug_log("Starting room sync from Matrix client...".to_string());
+        
+        if let Some(matrix_client) = self.state_manager.matrix().get_client() {
+            self.logs.add_debug_log("Matrix client found, retrieving rooms...".to_string());
+            let matrix_rooms = matrix_client.rooms();
+            self.logs.add_debug_log(format!("Found {} Matrix rooms from client", matrix_rooms.len()));
+            
+            if matrix_rooms.is_empty() {
+                self.logs.add_debug_log("No Matrix rooms found - user may not have joined any rooms yet".to_string());
+                self.logs.add_debug_log("Try creating a room with: cargo run --bin create_test_room".to_string());
+                return Ok(());
+            }
+            
+            for (i, matrix_room) in matrix_rooms.iter().enumerate() {
+                let room_id = matrix_room.room_id().to_string();
+                self.logs.add_debug_log(format!("Processing room {} ({}): {}", i+1, room_id, room_id));
+                
+                // Get room name
+                let room_name = match matrix_room.display_name().await {
+                    Ok(name) => {
+                        self.logs.add_debug_log(format!("Room display name: {}", name));
+                        name.to_string()
+                    },
+                    Err(e) => {
+                        self.logs.add_debug_log(format!("Failed to get display name: {}, using room ID", e));
+                        room_id.clone()
+                    }
+                };
+                
+                // Create nok Room from Matrix room
+                let mut room = super::room::Room::from_matrix_room(room_id.clone(), room_name.clone());
+                
+                // Set additional room properties
+                // Note: is_encrypted() might not be available in all matrix-sdk versions
+                // room.is_encrypted = matrix_room.is_encrypted().await.unwrap_or(false);
+                room.member_count = matrix_room.joined_members_count() as usize;
+                self.logs.add_debug_log(format!("Room member count: {}", room.member_count));
+                
+                // Add room if it doesn't already exist
+                if !self.data.rooms.iter().any(|r| r.matrix_id.as_ref() == Some(&room_id)) {
+                    self.logs.add_debug_log(format!("Adding new room to UI: '{}'", room.name));
+                    self.data.add_room(room);
+                } else {
+                    self.logs.add_debug_log(format!("Room already exists in UI: '{}'", room.name));
+                }
+            }
+            
+            self.logs.add_debug_log(format!("Room sync complete - Total UI rooms: {}", self.data.rooms.len()));
+            
+            // Set first room as current if none is selected
+            if self.data.get_current_room().is_none() && !self.data.rooms.is_empty() {
+                self.data.set_current_room_idx(0);
+                self.logs.add_debug_log(format!("Set '{}' as current room", self.data.rooms[0].name));
+            }
+        } else {
+            self.logs.add_debug_log("ERROR: Matrix client not found!".to_string());
+            return Err(crate::util::NokError::MatrixClientNotInitialized);
+        }
+        
         Ok(())
     }
 }

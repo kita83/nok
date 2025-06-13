@@ -20,6 +20,15 @@ pub struct MatrixClient {
     sync_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
 }
 
+impl std::fmt::Debug for MatrixClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MatrixClient")
+            .field("config", &self.config)
+            .field("sync_active", &"<sync_handle>")
+            .finish()
+    }
+}
+
 impl MatrixClient {
     /// Create a new Matrix client
     pub async fn new(config: MatrixConfig) -> Result<Self, Box<dyn std::error::Error>> {
@@ -117,10 +126,6 @@ impl MatrixClient {
         Ok(())
     }
 
-    /// Get current user ID
-    pub fn user_id(&self) -> Option<&UserId> {
-        self.inner.user_id()
-    }
 
     /// Get all joined rooms
     pub fn rooms(&self) -> Vec<Room> {
@@ -140,6 +145,11 @@ impl MatrixClient {
                 .unwrap_or_else(|_| "Unknown Room".to_string());
             println!("Received message in room {}: {:?}", room_name, event);
         });
+    }
+
+    /// Get the current user ID if logged in
+    pub fn user_id(&self) -> Option<OwnedUserId> {
+        self.inner.user_id().map(|user_id| user_id.to_owned())
     }
 
     /// Get the underlying Matrix SDK client

@@ -164,6 +164,12 @@ impl DataState {
     pub fn get_selected_user(&self, selected_idx: Option<usize>) -> Option<&User> {
         selected_idx.and_then(|idx| self.users.get(idx))
     }
+
+    pub fn set_current_room_idx(&mut self, idx: usize) {
+        if idx < self.rooms.len() {
+            self.current_room = idx;
+        }
+    }
 }
 
 impl LogState {

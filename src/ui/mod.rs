@@ -834,7 +834,7 @@ fn render_main_ui_new(f: &mut Frame, app: &mut NewApp) {
     let actual_rooms_content_area = rooms_block.inner(rooms_area);
     f.render_widget(rooms_block, rooms_area);
 
-    let room_items: Vec<ListItem> = app.data.rooms.iter().enumerate().map(|(i, r)| {
+    let room_items: Vec<ListItem> = app.data.rooms.iter().enumerate().map(|(_i, r)| {
         let content = if app.data.get_current_room().map_or(false, |cr| cr.id == r.id) {
             format!("* {}", r.name)
         } else {
