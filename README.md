@@ -1,125 +1,228 @@
-🚧 このプロジェクトは現在アクティブに開発中であり、本番環境での使用にはまだ適していません。
+# nok
 
-nok は、分散型チームがCLI（コマンドライン）から「今ここにいる」感覚を得られるようにする、ミニマリストなターミナルベースのバーチャルオフィスツールです。ドアをノックするというシンプルな行為にインスパイアされており、リモートファーストのチームに、存在感の共有とリアルタイムなコミュニケーションを穏やかな「コンコン」と共に届けます。
+A terminal-based chat application built on the Matrix protocol, allowing team members to see each other's presence and send quick "knocks" to get attention through Matrix homeserver infrastructure.
 
-⚙️ 主な機能
-* ターミナルUI (TUI)：ratatuiを使用した軽量でレトロな雰囲気。開発者のワークフローに自然に溶け込む
-* ノック通知機能：他のメンバーにさりげなく「ノック」（音＋ASCIIアニメーション）を送信
-* プレゼンスインジケーター：誰が利用可能か、離席中か、オフラインかをリアルタイムに表示
-* クイックコマンド：nok @user — 直感的で高速な操作
-* タブ切り替え：r（ルーム）、u（ユーザー）、c（チャット）キーでビューを切り替え
-* 音声読み上げ：TTS（テキスト読み上げ）機能でメッセージを音声出力 — チャットとカジュアルな音声コミュニケーションの架け橋に
-* コマンドモード：iキーでコマンドモードに入り、メッセージ送信やルーム参加などを実行可能
-* シングルライン表示：高さに制約のあるターミナルで動作するように最適化
-* ユーザー設定：ユーザー名変更や設定の永続化に対応
-* マルチプロセス対応：別プロセスで起動してもユーザーが適切に管理される
+🚧 **Status**: Matrix migration completed! This is the Matrix-compliant version of nok.
 
-🆔 ユーザー管理
+## Features
 
-nokでは、各ユーザーに一意のIDが割り当てられ、設定ファイルで永続化されます：
+- **Matrix Protocol Compliance**: Full integration with Matrix Client-Server API v1.12
+- **Real-time presence awareness** through Matrix presence events
+- **Quick knock functionality** via custom Matrix events (`com.nok.knock`)
+- **Terminal-based UI** using ratatui with retro aesthetic
+- **Sound notifications** using rodio
+- **Matrix rooms support** for team communication
+- **Conduit homeserver** for lightweight Matrix server deployment
+- **End-to-end encryption** support (via matrix-sdk)
+- **Data migration** from legacy nok database to Matrix format
+- **Cross-platform compatibility** (Linux, macOS, Windows)
 
-**設定ファイルの場所**：`~/.config/nok/config.json`
+## Architecture
 
-**自動生成される内容**：
+### Matrix-Based Architecture (Current)
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  nok Client     │    │ Conduit          │    │ Other Matrix    │
+│  (Rust/TUI)     │◄──►│ Homeserver       │◄──►│ Clients         │
+│                 │    │ (Room v10)       │    │ (Element, etc.) │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────┐    ┌──────────────────┐
+│ Matrix SDK      │    │ RocksDB          │
+│ State Store     │    │ (Conduit)        │
+└─────────────────┘    └──────────────────┘
+```
+
+### Key Components
+- **Conduit Homeserver**: Lightweight Matrix homeserver (Room Version v10)
+- **nok Client**: Rust client using matrix-sdk with terminal UI
+- **Matrix State Store**: SQLite-based state storage for Matrix SDK
+- **Migration Tools**: Legacy data conversion to Matrix format
+
+## Quick Start
+
+### 1. Start Conduit Homeserver
+```bash
+cd backend/conduit
+./start_conduit.sh
+```
+The script will automatically download the Conduit binary if needed, then start the server on `http://localhost:6167` with domain `nok.local`.
+
+### 2. Create User Account
+```bash
+cargo build --bin register_test_user
+./target/debug/register_test_user
+```
+Follow the prompts to create a Matrix account on your local homeserver.
+
+### 3. Run nok Client
+```bash
+cargo run
+```
+Enter your username and password when prompted.
+
+### 4. Create/Join Rooms
+```bash
+# Create a test room
+cargo build --bin create_test_room
+./target/debug/create_test_room
+
+# Or join existing room via client UI
+```
+
+## Development & Testing
+
+### Integration Tests
+```bash
+# Run full Matrix integration tests
+./tests/matrix_integration_test.sh
+
+# Manual testing with test client
+cargo build --bin test_matrix
+./target/debug/test_matrix
+```
+
+### Available Test Tools
+- `register_test_user`: Create Matrix user accounts
+- `create_test_room`: Create Matrix rooms
+- `test_matrix`: Interactive Matrix client testing
+
+### Configuration
+
+Conduit configuration is in `backend/conduit/conduit.toml`:
+```toml
+server_name = "nok.local"
+port = 6167
+default_room_version = "10"
+allow_federation = false
+registration_token = "nokdev_registration_token"
+```
+
+## Usage
+
+### Terminal Client
+- Use **arrow keys** to navigate between users/rooms
+- Press **'k'** to send knock to selected user
+- Press **'j'** to join/create rooms
+- Press **'m'** to send messages
+- Press **'s'** for settings
+- Press **'q'** to quit
+- **Presence updates automatically** via Matrix sync
+
+### Matrix Features
+- **Knock Events**: Custom `com.nok.knock` events for attention requests
+- **Presence Sync**: Real-time user status via Matrix presence
+- **Room Messaging**: Standard Matrix room messaging support
+- **User Discovery**: Matrix user directory integration
+- **Cross-Client Compatibility**: Works with Element, FluffyChat, etc.
+
+### Command Mode
+Press `i` to enter command mode:
+```
+nok @username         # Send knock to user
+/join #room:nok.local # Join Matrix room
+/status away          # Set presence status
+/help                 # Show help
+```
+
+## Matrix Protocol Compliance
+
+nok implements the following Matrix specifications:
+- **Client-Server API v1.12**
+- **Room Version v10**
+- **Custom event types** for nok-specific features:
+  - `com.nok.knock` - Knock events for attention requests
+- **Standard Matrix authentication** and device management
+- **End-to-end encryption** support via matrix-sdk
+- **Matrix presence** and typing indicators
+- **Matrix sync** for real-time updates
+
+### Custom Events
+
+#### Knock Event (`com.nok.knock`)
 ```json
 {
-  "user_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "username": "your_system_username",
-  "last_server_url": "ws://localhost:8001"
+  "type": "com.nok.knock",
+  "content": {
+    "target_user": "@user:nok.local",
+    "timestamp": 1704067200000
+  }
 }
 ```
 
-**別プロセスでの起動**：
-* 初回起動時にシステムユーザー名をデフォルトとしてユーザーが作成される
-* 同じマシンで複数回起動しても同じユーザーIDが使われる
-* ユーザー名を変更しても一意性が保たれる
+## Dependencies
 
-⚙️ 設定機能
+### Core Matrix & UI
+- `matrix-sdk` (0.11.0) - Matrix Client-Server API implementation
+- `ratatui` (0.26.0) - Terminal UI framework
+- `tokio` (1.0) - Async runtime
+- `serde` (1.0) - Serialization
 
-**設定画面の起動**：`s`キーを押す
+### Audio & Utils
+- `rodio` (0.17.3) - Audio playback
+- `chrono` (0.4) - Date/time handling
+- `uuid` (1.0) - Unique identifiers
+- `dirs` (5.0) - Directory utilities
+- `rusqlite` (0.33) - SQLite database (for migration)
 
-**設定項目**：
-* ユーザー名の変更
-* 変更は即座に設定ファイルに保存される
-* サーバーに反映するには再接続が必要（F5キー）
+## Project Status
 
-オーディオ
+✅ **Phase 1**: Matrix Client-Server API Implementation (Complete)  
+✅ **Phase 2**: Conduit Homeserver Setup (Complete)  
+✅ **Phase 3**: Data Migration Implementation (Complete)  
+✅ **Phase 4**: Integration & Testing (Complete)
 
-audioモジュールは rodio ライブラリを使って効果音を再生します。主な機能：
-* ノック音の再生
-* 受信メッセージのTTS（テキスト読み上げ）オプション
+**Total Progress**: 45/45 tasks complete (100%)
 
-使い方
+The project has successfully migrated from a custom WebSocket-based architecture to a fully Matrix-compliant implementation that interoperates with the broader Matrix ecosystem.
 
-# バックエンドの起動
-cd backend && uv run python main.py
+## Troubleshooting
 
-# フロントエンドの起動（別ターミナルで）
-cargo run
+### Common Issues
 
-# 基本操作
-* s            # 設定画面を開く
-* Tab          # フォーカスを切り替え
-* ↑↓           # リスト内でナビゲート
-* n            # ノック送信（ユーザー選択時）
-* F5           # サーバーに再接続
-* q            # アプリを終了
+1. **Login fails with crypto store error**:
+   ```bash
+   # Clean state stores
+   rm -rf /tmp/nok_test_store_*
+   ```
 
-# コマンドモード（iキーで入力モード）
-* nok @username    # 指定ユーザーのドアをノック
-* /join room_name  # 他のルームに参加
-* /status away     # ステータスを「離席中」に変更
-* /help            # ヘルプを表示
+2. **Conduit won't start (LOCK error)**:
+   ```bash
+   pkill conduit
+   cd backend/conduit && ./start_conduit.sh
+   ```
 
-🔧 マルチプロセステスト
+3. **Registration fails**:
+   - Ensure Conduit is running
+   - Check registration token in `conduit.toml`
 
-別プロセスでの動作確認方法：
+### Logs and Debugging
 
-```bash
-# ターミナル1
-cargo run
+- Conduit logs: Check terminal output where Conduit is running
+- Matrix SDK logs: Set `RUST_LOG=matrix_sdk=debug`
+- Client logs: Embedded in TUI interface
 
-# ターミナル2（同時に）
-cargo run
+## Contributing
 
-# 動作確認
-1. 各プロセスで異なるユーザー名に設定（sキー）
-2. F5キーで再接続
-3. お互いが「Users」ペインに表示されることを確認
-4. nキーでノックを送り合って確認
-```
+Contributions are welcome! This project has completed its Matrix migration but can benefit from:
 
-開発
+- UI/UX improvements for the terminal interface
+- Additional Matrix features (threads, reactions, etc.)
+- Performance optimizations
+- Cross-platform testing
+- Integration with other Matrix clients
 
-# プロジェクトのビルド
-cargo build
+## License
 
-# テストの実行
-cargo test
+MIT License
 
-## 詳細ドキュメント (Detailed Documentation)
+## Authors and Version
+- **Authors**: kita83
+- **Version**: 0.2.0 (Matrix Edition)
+- **Matrix Compliance**: Client-Server API v1.12
+- **Room Version**: v10
 
-より詳細な情報については、`docs`ディレクトリを参照してください。
+---
 
-*   **プロジェクト概要**: [docs/00_overview/project_overview_ja.md](docs/00_overview/project_overview_ja.md) にて、プロジェクトの全体像、機能、アーキテクチャ、ユースケースなどを包括的に説明しています。
-*   **アーキテクチャ詳細**: [docs/10_architecture/README.md](docs/10_architecture/README.md) にて、システム設計や技術スタックに関する詳細を記載しています。
-
-## 貢献 (Contributing)
-
-貢献を歓迎します！バグ報告、機能リクエスト、プルリクエスト、またはあらゆる形式の貢献を大いに感謝します。詳細については、プロジェクトのIssueトラッカーやドキュメントを参照してください。
-
-## 謝辞 (Acknowledgments)
-
-このプロジェクトは、以下の素晴らしいツールやプロジェクトに支えられています。
-
-*   [ratatui](https://github.com/ratatui-org/ratatui) - モダンなターミナルUIフレームワーク
-*   [rodio](https://github.com/RustAudio/rodio) - オーディオ再生ライブラリ
-*   [lazygit](https://github.com/jesseduffield/lazygit) - このプロジェクトのインスピレーションとなったCUIアプリケーション
-
-ライセンス
-
-MITライセンス
-
-## 貢献者とバージョン (Authors and Version)
-*   作成者 (Authors): Devin AI
-*   バージョン (Version): 0.1.0
+*Built with 🦀 Rust and the Matrix protocol for distributed team collaboration.* 

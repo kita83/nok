@@ -4,6 +4,12 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+pub mod validation;
+pub mod error;
+
+pub use validation::{ValidationError, LoginValidator};
+pub use error::{NokError, NokResult, ErrorSeverity};
+
 // Save data to a JSON file
 pub fn save_to_file<T: Serialize>(data: &T, path: &Path) -> io::Result<()> {
     let json = serde_json::to_string_pretty(data)?;

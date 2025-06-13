@@ -48,6 +48,7 @@ pub struct CreateMessage {
     pub target_user_id: Option<String>,
 }
 
+#[derive(Debug)]
 pub struct ApiClient {
     client: Client,
     base_url: String,

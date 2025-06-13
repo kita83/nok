@@ -108,3 +108,9 @@ Cargo.lock
 # Project
 .tasks
 *.db
+
+# Conduit database files
+backend/conduit/database/
+
+# Conduit binary (downloaded automatically)
+backend/conduit/conduit

@@ -1,0 +1,15 @@
+# Conduit database files
+database/
+
+# Conduit source code (external dependency)
+conduit-src/
+
+# Environment variables (contains sensitive credentials)
+.env
+
+# Generated configuration file
+conduit.toml
+
+# Log files
+*.log
+*.log.*

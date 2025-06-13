@@ -6,16 +6,51 @@ authors = ["Devin AI"]
 description = "A terminal-based virtual office application"
 
 [dependencies]
+# Matrix client SDK
+matrix-sdk = { version = "0.11.0", features = ["e2e-encryption", "sqlite", "qrcode"] }
+
+# UI dependencies
 ratatui = { version = "0.26.0", features = ["all-widgets"] }
 crossterm = "0.27.0"
+
+# Audio
 rodio = "0.17.3"
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# Time and utilities
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+dirs = "5.0"
+whoami = "1.4"
+
+# HTTP client (kept for potential compatibility)
 reqwest = { version = "0.11", features = ["json"], default-features = false }
+
+# Database
+rusqlite = { version = "0.33", features = ["bundled"] }
+regex = "1.10"
+
+# Async runtime
 tokio = { version = "1.0", features = ["full"] }
 tokio-tungstenite = "0.20"
 futures-util = "0.3"
-uuid = { version = "1.0", features = ["v4", "serde"] }
-dirs = "5.0"
+
+[[bin]]
+name = "nok"
+path = "src/main.rs"
+
+[[bin]]
+name = "test_matrix"
+path = "src/bin/test_matrix.rs"
+
+[[bin]]
+name = "register_test_user"
+path = "src/bin/register_test_user.rs"
+
+[[bin]]
+name = "create_test_room"
+path = "src/bin/create_test_room.rs"

@@ -20,6 +20,15 @@ pub struct WebSocketClient {
     receiver: Option<mpsc::UnboundedReceiver<WebSocketMessage>>,
 }
 
+impl std::fmt::Debug for WebSocketClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebSocketClient")
+            .field("sender_active", &self.sender.is_some())
+            .field("receiver_active", &self.receiver.is_some())
+            .finish()
+    }
+}
+
 impl WebSocketClient {
     pub fn new() -> Self {
         Self {
